@@ -71,13 +71,19 @@ export async function completeReview(
 }
 
 export function formatReview(completion: Completion, marker: string): string {
-  const body = `${marker}\n\n${completion.review}`;
+  // Put the disclosure before model output so unfinished Markdown cannot swallow it.
+  const notice =
+    '> **AI-generated review** by [OpenRouter Review](https://github.com/hgschmie/openrouter-review).\n' +
+    '> Verify findings before applying changes. ' +
+    '[Feedback](https://github.com/hgschmie/openrouter-review/issues/new?template=ai-review.yml) · ' +
+    '[Report to GitHub](https://docs.github.com/en/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam).';
+  const body = `${marker}\n\n${notice}\n\n${completion.review}`;
   // Leave space below GitHub's comment limit; measure bytes conservatively for Unicode.
   if (Buffer.byteLength(body) > 60_000)
     throw new Error('The review is too large to publish. Lower max-tokens or request a more concise review.');
   if (!completion.reasoning) return body;
   const details = `\n\n<details>\n<summary>Reasoning Details</summary>\n\n${completion.reasoning}\n\n</details>`;
-  return Buffer.byteLength(body + details) <= 60_000
-    ? body + details
-    : body + '\n\n_Reasoning omitted because it exceeds the review size limit._';
+  if (Buffer.byteLength(body + details) <= 60_000) return body + details;
+  const omitted = '\n\n_Reasoning omitted because it exceeds the review size limit._';
+  return Buffer.byteLength(body + omitted) <= 60_000 ? body + omitted : body;
 }

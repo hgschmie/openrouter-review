@@ -1,0 +1,56 @@
+name: AI review feedback
+description: Report incorrect, unsafe, or inappropriate review output using a sanitized reproduction.
+title: '[AI review] '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue will be public. Use synthetic examples and remove credentials, private code, personal information, and sensitive links.
+        For security/privacy concerns, [file a GitHub issue](https://github.com/hgschmie/openrouter-review/issues/new/choose) with only a brief description that is safe to share publicly. Do not include sensitive vulnerability details.
+        To report policy violations to GitHub, see https://docs.github.com/en/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam.
+  - type: input
+    id: action-version
+    attributes:
+      label: Action tag or commit
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model and provider
+      description: Model ID and provider if known. Do not include API keys or URLs containing credentials.
+    validations:
+      required: true
+  - type: dropdown
+    id: problem
+    attributes:
+      label: Problem
+      options:
+        - Incorrect finding or missed defect
+        - Unsafe suggested change
+        - Inappropriate output
+        - Prompt injection
+        - Other review behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Sanitized reproduction and settings
+      description: Prefer a small invented diff/comment. Include relevant prompts and generation settings only if safe to share.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Describe sensitive or abusive output rather than reproducing it when possible.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Public report check
+      options:
+        - label: I removed credentials, private code, personal information, and sensitive links from this report.
+          required: true

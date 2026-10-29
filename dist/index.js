@@ -27182,7 +27182,10 @@ async function completeReview(config, payload, fetchImpl = fetch, wait) {
   }, wait);
 }
 function formatReview(completion, marker) {
+  const notice2 = "> **AI-generated review** by [OpenRouter Review](https://github.com/hgschmie/openrouter-review).\n> Verify findings before applying changes. [Feedback](https://github.com/hgschmie/openrouter-review/issues/new?template=ai-review.yml) \xB7 [Report to GitHub](https://docs.github.com/en/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam).";
   const body = `${marker}
+
+${notice2}
 
 ${completion.review}`;
   if (Buffer.byteLength(body) > 6e4)
@@ -27196,7 +27199,9 @@ ${completion.review}`;
 ${completion.reasoning}
 
 </details>`;
-  return Buffer.byteLength(body + details) <= 6e4 ? body + details : body + "\n\n_Reasoning omitted because it exceeds the review size limit._";
+  if (Buffer.byteLength(body + details) <= 6e4) return body + details;
+  const omitted = "\n\n_Reasoning omitted because it exceeds the review size limit._";
+  return Buffer.byteLength(body + omitted) <= 6e4 ? body + omitted : body;
 }
 
 // src/review.ts

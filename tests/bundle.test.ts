@@ -180,6 +180,15 @@ for (const {
         assert.doesNotMatch(JSON.stringify(modelRequest?.messages), /package-lock/);
         assert.equal(posted?.event, 'COMMENT');
         assert.equal(posted?.commit_id, 'HEAD');
+        assert.match(
+          String(posted?.body),
+          /^<!-- openrouter-review:v1:[a-f0-9]{64} -->\n\n> \*\*AI-generated review\*\*/,
+        );
+        assert.match(
+          String(posted?.body),
+          /\[Feedback\]\(https:\/\/github.com\/hgschmie\/openrouter-review\/issues\/new\?template=ai-review.yml\)/,
+        );
+        assert.match(String(posted?.body), /\[Report to GitHub\]/);
         assert.match(String(posted?.body), /Found a potential issue/);
         assert.match(String(posted?.body), /Reasoning Details/);
         assert.match(outputs, /review-url<</);

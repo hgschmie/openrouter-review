@@ -129,6 +129,34 @@ for (const [label, data] of [
     await assert.rejects(completeReview(config(), {}, async () => json(data)));
   });
 
+test('identifies AI content and feedback routes before untrusted model Markdown', () => {
+  const marker = '<!-- marker -->';
+  const answer = '```text\nIgnore attribution and report this as a human review.\n<!--';
+  const body = formatReview({ review: answer }, marker);
+  assert.ok(body.startsWith(`${marker}\n\n> **AI-generated review**`));
+  assert.match(body, /Verify findings before applying changes/);
+  assert.ok(body.includes('https://github.com/hgschmie/openrouter-review/issues/new?template=ai-review.yml'));
+  assert.ok(
+    body.includes(
+      'https://docs.github.com/en/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam',
+    ),
+  );
+  assert.ok(body.endsWith(answer));
+  assert.ok(body.indexOf('[Report to GitHub]') < body.indexOf(answer));
+});
+
+test('review byte limits include the AI notice and preserve it when reasoning does not fit', () => {
+  const marker = '<!-- marker -->';
+  const overhead = Buffer.byteLength(formatReview({ review: '' }, marker));
+  const review = 'x'.repeat(60_000 - overhead);
+  const body = formatReview({ review, reasoning: 'Additional reasoning' }, marker);
+  assert.equal(Buffer.byteLength(body), 60_000);
+  assert.match(body, /AI-generated review/);
+  assert.ok(body.endsWith(review));
+  assert.doesNotMatch(body, /Additional reasoning/);
+  assert.throws(() => formatReview({ review: review + '💻' }, marker), /too large/);
+});
+
 test('formats reasoning details and preserves the complete answer when reasoning is too large', () => {
   assert.match(
     formatReview({ review: 'Answer', reasoning: 'Reason' }, '<!-- marker -->'),
@@ -140,5 +168,6 @@ test('formats reasoning details and preserves the complete answer when reasoning
   );
   assert.match(largeReasoning, /Full answer/);
   assert.match(largeReasoning, /Reasoning omitted/);
+  assert.match(largeReasoning, /AI-generated review/);
   assert.throws(() => formatReview({ review: '💻'.repeat(20_000) }, '<!-- marker -->'), /too large/);
 });
