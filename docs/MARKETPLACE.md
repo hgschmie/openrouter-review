@@ -26,7 +26,7 @@ The reviewed agreement does not prohibit AI-assisted source-code development. Th
 
 - [ ] Approve the source, docs, contact information, and privacy wording; complete and record the live evaluation.
 - [ ] Run `npm run check` and review CI for the exact release commit.
-- [ ] Choose the next semantic version and update package metadata and the README example. `v1.1.0` predates these changes; do not move that existing tag.
+- [ ] Choose the release version and ensure package metadata and the README example match. Do not move an existing release tag.
 - [ ] Commit the reviewed source, docs, tests, and rebuilt `dist/` files; create and push a new annotated `vMAJOR.MINOR.PATCH` tag.
 - [ ] The repository owner confirms two-factor authentication and reviews/accepts the Marketplace Developer Agreement if needed. Acceptance has not been verified or performed by this change.
 - [ ] Draft a GitHub Release for that tag, select **Publish this Action to the GitHub Marketplace**, resolve name/metadata validation, and choose appropriate categories.

@@ -7,7 +7,7 @@ This guide provides a repeatable manual evaluation for the maintainer and users 
 ## Run procedure
 
 1. Use a disposable repository containing only the synthetic code below. Obtain authorization for model usage and set a provider spending limit. Never include real credentials, private code, or personal information in evaluation inputs.
-2. Pin the action to the reviewed candidate commit containing the disclosure change. `v1.1.0` predates that change. Use the README's minimal permissions and trusted workflow structure, without checking out or executing PR code.
+2. Pin the action to the reviewed candidate commit containing the fixed AI disclosure. Use the README's minimal permissions and trusted workflow structure, without checking out or executing PR code.
 3. Record the action commit, date, model ID, actual provider if known, endpoint, prompt text/version, reasoning settings, `max-tokens`, and routing settings. Set an explicit output budget large enough for the reasoning configuration. Never put credentials in the record.
 4. Start with the default model and prompts. Repeat for other configurations you intend to recommend. Use separate small PRs for the cases. For comment cases, enable `watch-mention: '@review'` and allow only the trusted evaluator's association.
 5. Run each case at least twice per selected configuration. A repeated identical PR event deduplicates; use a fresh PR or distinct qualifying comment to request another evaluation. Record errors and refusals rather than silently replacing them with successful attempts.

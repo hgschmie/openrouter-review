@@ -58,6 +58,35 @@ test('retries embedded API errors returned with HTTP 200', async () => {
   assert.equal(calls, 2);
 });
 
+test('handles provider errors inside a choice before validating its message', async () => {
+  let calls = 0;
+  const result = await completeReview(
+    config(),
+    {},
+    async () => {
+      calls++;
+      return json(
+        calls === 1
+          ? { choices: [{ finish_reason: 'error', error: { code: 503, message: 'Unavailable' } }] }
+          : completion(),
+      );
+    },
+    async () => {},
+  );
+  assert.equal(calls, 2);
+  assert.equal(result.review, 'A useful review.');
+
+  calls = 0;
+  await assert.rejects(
+    completeReview(config(), {}, async () => {
+      calls++;
+      return json({ choices: [{ error: { code: 400, message: 'Unsupported parameter' } }] });
+    }),
+    /Model request failed \(HTTP 200, API code 400\): Unsupported parameter/,
+  );
+  assert.equal(calls, 1);
+});
+
 test('stops after three transient failures', async () => {
   let calls = 0;
   await assert.rejects(
@@ -117,6 +146,90 @@ test('times out an unresponsive model request without retrying', async () => {
     clearInterval(keepAlive);
   }
 });
+
+test('reports a timeout while reading an HTTP 200 body without retrying', async () => {
+  const cfg = { ...config(), timeoutMs: 10 };
+  const keepAlive = setInterval(() => {}, 100);
+  let calls = 0;
+  try {
+    await assert.rejects(
+      completeReview(cfg, {}, async (_url, init) => {
+        calls++;
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              // Providers can send headers/whitespace before completing generation.
+              controller.enqueue(new TextEncoder().encode(' '));
+              init!.signal!.addEventListener('abort', () => controller.error(init!.signal!.reason), {
+                once: true,
+              });
+            },
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        );
+      }),
+      /timed out after 0\.01 seconds while reading the response\. Increase timeout-seconds/,
+    );
+    assert.equal(calls, 1);
+  } finally {
+    clearInterval(keepAlive);
+  }
+});
+
+test('preserves connection failures while reading a response without retrying', async () => {
+  const failure = new TypeError('Connection terminated while reading response');
+  let calls = 0;
+  await assert.rejects(
+    completeReview(config(), {}, async () => {
+      calls++;
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.error(failure);
+          },
+        }),
+      );
+    }),
+    (error) => error === failure,
+  );
+  assert.equal(calls, 1);
+});
+
+test('distinguishes malformed JSON from invalid completion structure without exposing the body', async () => {
+  for (const body of ['<html>PRIVATE_RESPONSE</html>', '{"private":"PRIVATE_RESPONSE"']) {
+    let calls = 0;
+    await assert.rejects(
+      completeReview(config(), {}, async () => {
+        calls++;
+        return new Response(body);
+      }),
+      (error: Error) => {
+        assert.match(error.message, /returned invalid JSON \(HTTP 200\)/);
+        assert.doesNotMatch(error.message, /PRIVATE_RESPONSE/);
+        return true;
+      },
+    );
+    assert.equal(calls, 1);
+  }
+});
+
+for (const [data, problem] of [
+  [null, 'choices is missing or is not an array'],
+  [{ choices: 'PRIVATE_RESPONSE' }, 'choices is missing or is not an array'],
+  [{ choices: [] }, 'choices is empty'],
+  [{ choices: [{ text: 'PRIVATE_RESPONSE' }] }, 'choices[0].message is missing or is not an object'],
+] as const)
+  test(`describes invalid completion structure: ${JSON.stringify(data)}`, async () => {
+    await assert.rejects(
+      completeReview(config(), {}, async () => json(data)),
+      (error: Error) => {
+        assert.match(error.message, /invalid chat completion \(HTTP 200\)/);
+        assert.ok(error.message.includes(problem));
+        assert.doesNotMatch(error.message, /PRIVATE_RESPONSE/);
+        return true;
+      },
+    );
+  });
 
 for (const [label, data] of [
   ['empty answer', completion('')],

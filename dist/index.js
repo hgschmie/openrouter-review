@@ -27142,27 +27142,47 @@ ${comment}
 }
 async function completeReview(config, payload, fetchImpl = fetch, wait) {
   return withRetries(async () => {
+    const signal = AbortSignal.timeout(config.timeoutMs);
     const response = await fetchImpl(`${config.baseUrl}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(config.timeoutMs),
+      signal,
       redirect: "error"
     });
-    const data = await response.json().catch(() => null);
-    const apiError = object(data) && object(data.error) ? data.error : void 0;
+    let data;
+    try {
+      data = await response.json();
+    } catch (error2) {
+      if (signal.aborted)
+        throw new Error(
+          `Model request timed out after ${config.timeoutMs / 1e3} seconds while reading the response. Increase timeout-seconds or reduce the diff or reasoning budget.`,
+          { cause: error2 }
+        );
+      if (!(error2 instanceof SyntaxError)) throw error2;
+      if (response.ok)
+        throw new Error(
+          `The model endpoint returned invalid JSON (HTTP ${response.status}). Check base-url and provider availability.`
+        );
+    }
+    const choice = object(data) && Array.isArray(data.choices) ? data.choices[0] : void 0;
+    const apiError = object(data) && object(data.error) ? data.error : object(choice) && object(choice.error) ? choice.error : void 0;
     if (!response.ok || apiError) {
       const status = response.ok && typeof apiError?.code === "number" ? apiError.code : response.status;
+      const code = typeof apiError?.code === "number" ? `, API code ${apiError.code}` : "";
       const detail = typeof apiError?.message === "string" ? `: ${apiError.message.slice(0, 500)}` : "";
       throw new HttpError(
-        `Model request failed (HTTP ${status})${detail}`,
+        `Model request failed (HTTP ${response.status}${code})${detail}`,
         status,
         response.headers.get("retry-after")
       );
     }
-    const choice = object(data) && Array.isArray(data.choices) ? data.choices[0] : void 0;
-    if (!object(choice) || !object(choice.message))
-      throw new Error("The model returned an invalid chat completion.");
+    if (!object(choice) || !object(choice.message)) {
+      const problem = !object(data) || !Array.isArray(data.choices) ? "choices is missing or is not an array" : data.choices.length === 0 ? "choices is empty" : "choices[0].message is missing or is not an object";
+      throw new Error(
+        `The model endpoint returned an invalid chat completion (HTTP ${response.status}): ${problem}. Expected a non-streaming chat response. Check base-url and model/provider compatibility.`
+      );
+    }
     if (choice.finish_reason !== "stop") {
       throw new Error(
         "The model did not finish a complete text review. Check the output token budget, content filters, and request options."
