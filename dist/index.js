@@ -27140,7 +27140,17 @@ ${comment}
     ]
   };
 }
-async function completeReview(config, payload, fetchImpl = fetch, wait) {
+function formatTokenUsage(usage) {
+  const data = object(usage) ? usage : {};
+  const count = (value) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : void 0;
+  const prompt = count(data.prompt_tokens);
+  const totalCompletion = count(data.completion_tokens);
+  const details = object(data.completion_tokens_details) ? data.completion_tokens_details : {};
+  const reasoning = count(details.reasoning_tokens);
+  const completion = totalCompletion !== void 0 && reasoning !== void 0 && reasoning <= totalCompletion ? totalCompletion - reasoning : void 0;
+  return `prompt tokens: ${prompt ?? "unavailable"} / completion tokens: ${completion ?? "unavailable"} / reasoning tokens: ${reasoning ?? "unavailable"}`;
+}
+async function completeReview(config, payload, fetchImpl = fetch, wait, reportUsage) {
   return withRetries(async () => {
     const signal = AbortSignal.timeout(config.timeoutMs);
     const response = await fetchImpl(`${config.baseUrl}/chat/completions`, {
@@ -27177,6 +27187,7 @@ async function completeReview(config, payload, fetchImpl = fetch, wait) {
         response.headers.get("retry-after")
       );
     }
+    reportUsage?.(formatTokenUsage(object(data) ? data.usage : void 0));
     if (!object(choice) || !object(choice.message)) {
       const problem = !object(data) || !Array.isArray(data.choices) ? "choices is missing or is not an array" : data.choices.length === 0 ? "choices is empty" : "choices[0].message is missing or is not an object";
       throw new Error(
@@ -27305,6 +27316,7 @@ async function runReview(config, trigger, github, complete = completeReview, inf
 }
 
 // src/index.ts
+var tokenUsage;
 async function main() {
   for (const name of ["api-key", "github-token"]) {
     const secret = getInput(name);
@@ -27316,7 +27328,9 @@ async function main() {
     config,
     trigger,
     createGitHub(config, context2.repo, trigger.number),
-    void 0,
+    (cfg, request2) => completeReview(cfg, request2, fetch, void 0, (message) => {
+      tokenUsage = message;
+    }),
     info
   );
   setOutput("review-url", result.reviewUrl ?? "");
@@ -27330,5 +27344,7 @@ async function main() {
 ` : "").write();
   }
 }
-main().catch((error2) => setFailed(error2 instanceof Error ? error2.message : "Review failed."));
+main().catch((error2) => setFailed(error2 instanceof Error ? error2.message : "Review failed.")).finally(() => {
+  if (tokenUsage) info(tokenUsage);
+});
 /*! For license information please see index.js.LEGAL.txt */

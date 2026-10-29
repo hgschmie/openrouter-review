@@ -19,8 +19,10 @@ const scenarios: {
   inputs?: Record<string, string>;
   reasoning?: Record<string, unknown>;
   notice?: string;
+  usage?: boolean;
 }[] = [
   { name: 'normal diff', diffMode: 'normal' },
+  { name: 'response without usage', diffMode: 'normal', usage: false },
   { name: 'oversized chunked diff', diffMode: 'oversized-chunked' },
   { name: 'oversized gzip diff', diffMode: 'oversized-gzip' },
   {
@@ -53,6 +55,7 @@ for (const {
   inputs = {},
   reasoning = { effort: 'high', exclude: false },
   notice,
+  usage = true,
 } of scenarios)
   test(
     `standalone bundle handles ${name} through real HTTP and exports action outputs`,
@@ -74,7 +77,19 @@ for (const {
           if (url.pathname === '/api/v1/chat/completions') {
             assert.equal(req.headers.authorization, 'Bearer fake-model-key');
             modelRequest = JSON.parse(body);
-            result = completion('Found a potential issue.', { reasoning: 'Consider the boundary case.' });
+            result = {
+              ...completion('Found a potential issue.', { reasoning: 'Consider the boundary case.' }),
+              ...(usage
+                ? {
+                    usage: {
+                      prompt_tokens: 100,
+                      completion_tokens: 50,
+                      completion_tokens_details: { reasoning_tokens: reasoning.enabled === false ? 0 : 30 },
+                      total_tokens: 150,
+                    },
+                  }
+                : {}),
+            };
           } else {
             assert.equal(req.headers.authorization, 'token fake-github-key');
             if (url.pathname.endsWith('/git/commits/HEAD')) result = { sha: 'HEAD', message: 'Fix bug' };
@@ -166,6 +181,7 @@ for (const {
         if (diffMode !== 'normal') {
           assert.match(result.stdout, /Raw diff exceeds max-diff-bytes/);
           assert.doesNotMatch(result.stdout, /Requesting model review/);
+          assert.doesNotMatch(result.stdout, /prompt tokens:/);
           assert.equal(modelRequest, undefined);
           assert.equal(posted, undefined);
           assert.equal(requests.filter((r) => r.method === 'POST').length, 0);
@@ -174,6 +190,10 @@ for (const {
           return;
         }
         assert.match(result.stdout, /Review published/);
+        const usageLine = usage
+          ? `prompt tokens: 100 / completion tokens: ${reasoning.enabled === false ? 50 : 20} / reasoning tokens: ${reasoning.enabled === false ? 0 : 30}`
+          : 'prompt tokens: unavailable / completion tokens: unavailable / reasoning tokens: unavailable';
+        assert.equal(result.stdout.trimEnd().split(/\r?\n/).at(-1), usageLine);
         assert.ok(result.stdout.includes('Requesting model review for PR #42: head HEAD, base BASE.'));
         assert.deepEqual(modelRequest?.reasoning, reasoning);
         if (inputs['max-tokens']) assert.equal(modelRequest?.max_tokens, Number(inputs['max-tokens']));

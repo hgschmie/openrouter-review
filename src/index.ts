@@ -3,6 +3,9 @@ import { context } from '@actions/github';
 import { readConfig } from './config.ts';
 import { createGitHub, selectTrigger } from './github.ts';
 import { runReview } from './review.ts';
+import { completeReview } from './openrouter.ts';
+
+let tokenUsage: string | undefined;
 
 async function main(): Promise<void> {
   for (const name of ['api-key', 'github-token']) {
@@ -18,7 +21,10 @@ async function main(): Promise<void> {
           config,
           trigger,
           createGitHub(config, context.repo, trigger.number),
-          undefined,
+          (cfg, request) =>
+            completeReview(cfg, request, fetch, undefined, (message) => {
+              tokenUsage = message;
+            }),
           core.info,
         );
   core.setOutput('review-url', result.reviewUrl ?? '');
@@ -36,4 +42,8 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => core.setFailed(error instanceof Error ? error.message : 'Review failed.'));
+main()
+  .catch((error) => core.setFailed(error instanceof Error ? error.message : 'Review failed.'))
+  .finally(() => {
+    if (tokenUsage) core.info(tokenUsage);
+  });

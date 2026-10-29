@@ -22,11 +22,27 @@ export interface Completion {
   reasoning?: string;
 }
 
+export function formatTokenUsage(usage: unknown): string {
+  const data = object(usage) ? usage : {};
+  const count = (value: unknown): number | undefined =>
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+  const prompt = count(data.prompt_tokens);
+  const totalCompletion = count(data.completion_tokens);
+  const details = object(data.completion_tokens_details) ? data.completion_tokens_details : {};
+  const reasoning = count(details.reasoning_tokens);
+  const completion =
+    totalCompletion !== undefined && reasoning !== undefined && reasoning <= totalCompletion
+      ? totalCompletion - reasoning
+      : undefined;
+  return `prompt tokens: ${prompt ?? 'unavailable'} / completion tokens: ${completion ?? 'unavailable'} / reasoning tokens: ${reasoning ?? 'unavailable'}`;
+}
+
 export async function completeReview(
   config: Config,
   payload: Record<string, unknown>,
   fetchImpl: typeof fetch = fetch,
   wait?: (ms: number) => Promise<unknown>,
+  reportUsage?: (message: string) => void,
 ): Promise<Completion> {
   return withRetries(async () => {
     const signal = AbortSignal.timeout(config.timeoutMs);
@@ -71,6 +87,7 @@ export async function completeReview(
         response.headers.get('retry-after'),
       );
     }
+    reportUsage?.(formatTokenUsage(object(data) ? data.usage : undefined));
     if (!object(choice) || !object(choice.message)) {
       const problem =
         !object(data) || !Array.isArray(data.choices)

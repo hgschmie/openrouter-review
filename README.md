@@ -160,6 +160,8 @@ The action's `timeout-seconds` defaults to 180 per HTTP attempt, including readi
 
 Immediately before requesting a model review, the action logs the PR number and full head and base commit SHAs for the captured diff. This identifies the revision being reviewed even if the request later fails. The job summary reports the outcome and links to the review. API keys are registered with GitHub's log masker. The action does not intentionally log prompts, diffs or full model responses, but upstream error messages can appear in logs; inspect them before sharing. See [data handling and retention](PRIVACY.md).
 
+After a model response, the action ends its log with `prompt tokens: N / completion tokens: N / reasoning tokens: N`. Completion tokens here exclude reasoning, so the three counts sum to the response's total token usage. Missing or invalid counts are shown as `unavailable`; without a reasoning count, the action cannot calculate completion tokens excluding reasoning. Usage is reported even if the returned review is rejected or cannot be published. It describes the received response, not cumulative usage from retries. Runs skipped before a model request, transport failures, and API error responses have no usage line.
+
 ## Appropriate use and limitations
 
 Use the action as an additional source of review suggestions for code you are authorized to send to the selected service. Human reviewers should reproduce findings, inspect proposed fixes, and run appropriate tests. A successful run means a review was delivered or intentionally skipped; it is not a security certification or evidence that the code is correct.

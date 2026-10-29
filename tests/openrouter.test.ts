@@ -1,8 +1,71 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRequest, completeReview, formatReview } from '../src/openrouter.ts';
+import { buildRequest, completeReview, formatReview, formatTokenUsage } from '../src/openrouter.ts';
 import { HttpError, withRetries } from '../src/http.ts';
 import { config, completion, json, patch } from './helpers.ts';
+
+test('usage reports disjoint prompt, visible completion, and reasoning counts', () => {
+  assert.equal(
+    formatTokenUsage({
+      prompt_tokens: 100,
+      completion_tokens: 50,
+      completion_tokens_details: { reasoning_tokens: 30 },
+      total_tokens: 150,
+    }),
+    'prompt tokens: 100 / completion tokens: 20 / reasoning tokens: 30',
+  );
+  assert.equal(
+    formatTokenUsage({
+      prompt_tokens: 0,
+      completion_tokens: 50,
+      completion_tokens_details: { reasoning_tokens: 0 },
+    }),
+    'prompt tokens: 0 / completion tokens: 50 / reasoning tokens: 0',
+  );
+});
+
+test('missing or invalid usage does not invent counts or produce negative completion tokens', () => {
+  for (const usage of [undefined, null, [], { prompt_tokens: -1, completion_tokens: '50' }])
+    assert.equal(
+      formatTokenUsage(usage),
+      'prompt tokens: unavailable / completion tokens: unavailable / reasoning tokens: unavailable',
+    );
+  assert.equal(
+    formatTokenUsage({ prompt_tokens: 100, completion_tokens: 50 }),
+    'prompt tokens: 100 / completion tokens: unavailable / reasoning tokens: unavailable',
+  );
+  for (const reasoning of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 60])
+    assert.match(
+      formatTokenUsage({ completion_tokens: 50, completion_tokens_details: { reasoning_tokens: reasoning } }),
+      /completion tokens: unavailable/,
+    );
+});
+
+test('reports usage even with excluded reasoning text or a truncated review', async () => {
+  for (const finish of ['stop', 'length']) {
+    const messages: string[] = [];
+    const response = completion('Review');
+    response.choices[0]!.finish_reason = finish;
+    const promise = completeReview(
+      config({ 'reasoning-exclude': 'true' }),
+      {},
+      async () =>
+        json({
+          ...response,
+          usage: {
+            prompt_tokens: 100,
+            completion_tokens: 50,
+            completion_tokens_details: { reasoning_tokens: 30 },
+          },
+        }),
+      undefined,
+      (message) => messages.push(message),
+    );
+    if (finish === 'stop') await promise;
+    else await assert.rejects(promise, /did not finish/);
+    assert.deepEqual(messages, ['prompt tokens: 100 / completion tokens: 20 / reasoning tokens: 30']);
+  }
+});
 
 test('sends the configured endpoint, authorization, body and timeout signal', async () => {
   const cfg = config({
