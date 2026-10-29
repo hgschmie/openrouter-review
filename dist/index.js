@@ -24584,7 +24584,7 @@ var defaults2 = {
   "base-url": "https://openrouter.ai/api/v1",
   model: "deepseek/deepseek-v4-flash",
   "sys-prompt": "You are a professional code review assistant responsible for analyzing code changes in GitHub Pull Requests. Identify potential issues such as code style violations, logical errors, security vulnerabilities, and provide improvement suggestions. Clearly list the problems and recommendations in a concise manner.",
-  "user-prompt": "Please review the following code changes",
+  "user-prompt": "Write all review explanations in English, regardless of the language used in the code or comments. Please review the following code changes",
   "request-options": "{}",
   "exclude-patterns": "pnpm-lock.yaml,package-lock.json,*.lock",
   "max-diff-chars": "100000",

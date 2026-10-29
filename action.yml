@@ -21,7 +21,9 @@ inputs:
     default: 'You are a professional code review assistant responsible for analyzing code changes in GitHub Pull Requests. Identify potential issues such as code style violations, logical errors, security vulnerabilities, and provide improvement suggestions. Clearly list the problems and recommendations in a concise manner.'
   user-prompt:
     description: User prompt preceding the diff.
-    default: Please review the following code changes
+    default: >-
+      Write all review explanations in English, regardless of the language used in the code or comments.
+      Please review the following code changes
   temperature:
     description: Optional sampling temperature (0 to 2); omitted when unset.
   max-tokens:

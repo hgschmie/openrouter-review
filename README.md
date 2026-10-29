@@ -97,7 +97,7 @@ See OpenRouter's [request parameters](https://openrouter.ai/docs/api_reference/p
 
 ## Prompts
 
-The defaults match the `sys-prompt` and `user-prompt` inputs of [DeepSeek Review](https://github.com/hgschmie/github-deepseek-review).
+The system prompt matches [DeepSeek Review](https://github.com/hgschmie/github-deepseek-review). The user prompt is adapted from it with an explicit instruction to write review explanations in English. Override `user-prompt` to request another language.
 
 Default system prompt:
 
@@ -105,7 +105,9 @@ Default system prompt:
 
 Default user prompt:
 
-> Please review the following code changes
+> Write all review explanations in English, regardless of the language used in the code or comments. Please review the following code changes
+
+The English-language instruction is unreleased; `v1.1.1` retains the earlier user prompt. Until the next release, pin a commit containing this change or set `user-prompt` explicitly.
 
 The user message consists of the user prompt, a colon and newline, and the filtered diff. For comment triggers, the triggering comment is appended inside `<comment>` tags. These delimiters organize context; they do not guarantee that a model will ignore instructions embedded in code or comments. The action does not supply tools or execute model instructions. Provider-side features enabled through `request-options` follow that provider's behavior and policies.
 

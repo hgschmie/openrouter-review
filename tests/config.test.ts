@@ -20,7 +20,10 @@ test('default payload omits optional generation settings', () => {
   assert.equal(payload.stream, false);
   assert.deepEqual(payload.messages, [
     { role: 'system', content: defaults['sys-prompt'] },
-    { role: 'user', content: `Please review the following code changes:\n${patch()}` },
+    {
+      role: 'user',
+      content: `Write all review explanations in English, regardless of the language used in the code or comments. Please review the following code changes:\n${patch()}`,
+    },
   ]);
 });
 
