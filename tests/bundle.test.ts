@@ -113,12 +113,13 @@ for (const diffMode of ['normal', 'oversized-chunked', 'oversized-gzip'] as cons
           timeout: 20_000,
         });
         assert.deepEqual(errors, []);
+        // @actions/core writes platform-native line endings to GITHUB_OUTPUT.
+        const outputs = (await readFile(join(dir, 'outputs'), 'utf8')).replace(/\r\n/g, '\n');
         if (diffMode !== 'normal') {
           assert.match(result.stdout, /Raw diff exceeds max-diff-bytes/);
           assert.equal(modelRequest, undefined);
           assert.equal(posted, undefined);
           assert.equal(requests.filter((r) => r.method === 'POST').length, 0);
-          const outputs = await readFile(join(dir, 'outputs'), 'utf8');
           assert.match(outputs, /skipped-reason<<[^\n]+\nRaw diff exceeds/);
           assert.match(outputs, /reviewed-sha<<[^\n]+\n\n/);
           return;
@@ -132,7 +133,6 @@ for (const diffMode of ['normal', 'oversized-chunked', 'oversized-gzip'] as cons
         assert.equal(posted?.commit_id, 'HEAD');
         assert.match(String(posted?.body), /Found a potential issue/);
         assert.match(String(posted?.body), /Reasoning Details/);
-        const outputs = await readFile(join(dir, 'outputs'), 'utf8');
         assert.match(outputs, /review-url<</);
         assert.match(outputs, /reviewed-sha<<[^\n]+\nHEAD\n/);
         assert.match(await readFile(join(dir, 'summary'), 'utf8'), /View review/);
