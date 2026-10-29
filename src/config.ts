@@ -58,7 +58,7 @@ function boolean(value: unknown, name: string): boolean {
   throw new Error(`${name} must be true or false.`);
 }
 
-export function readConfig(getInput: (name: string) => string): Config {
+export function readConfig(getInput: (name: string) => string, notice?: (message: string) => void): Config {
   const input = (name: string) => getInput(name) || defaults[name as keyof typeof defaults] || '';
   const required = (name: string) => {
     const value = input(name).trim();
@@ -111,42 +111,54 @@ export function readConfig(getInput: (name: string) => string): Config {
   }
   if ('max_tokens' in options && 'max_completion_tokens' in options)
     throw new Error('Set only one of max_tokens and max_completion_tokens.');
-  if ('reasoning' in options && !object(options.reasoning)) throw new Error('reasoning must be an object.');
-  const reasoning = { ...(options.reasoning as Record<string, unknown> | undefined) };
-  for (const key of ['effort', 'enabled', 'exclude', 'max_tokens']) {
-    const name = `reasoning-${key.replace('_', '-')}`;
-    const value = input(name).trim();
-    if (value)
-      reasoning[key] = key === 'max_tokens' ? Number(value) : key === 'effort' ? value : boolean(value, name);
-  }
-  if (
-    'effort' in reasoning &&
-    (typeof reasoning.effort !== 'string' ||
-      !['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(reasoning.effort))
-  ) {
-    throw new Error('reasoning-effort must be none, minimal, low, medium, high, xhigh, or max.');
-  }
-  for (const key of ['enabled', 'exclude']) {
-    if (key in reasoning && typeof reasoning[key] !== 'boolean')
-      throw new Error(`reasoning.${key} must be a JSON boolean.`);
-  }
-  if ('max_tokens' in reasoning) number(reasoning.max_tokens, 'reasoning-max-tokens', 1);
-  if ('effort' in reasoning && 'max_tokens' in reasoning)
-    throw new Error('Set reasoning-effort or reasoning-max-tokens, not both.');
-  if (
-    (reasoning.enabled === false &&
-      (('effort' in reasoning && reasoning.effort !== 'none') || 'max_tokens' in reasoning)) ||
-    (reasoning.enabled === true && reasoning.effort === 'none')
-  ) {
-    throw new Error('reasoning-enabled conflicts with the configured reasoning effort or budget.');
-  }
-  const budget = options.max_tokens ?? options.max_completion_tokens;
-  if (
-    typeof budget === 'number' &&
-    typeof reasoning.max_tokens === 'number' &&
-    reasoning.max_tokens >= budget
-  ) {
-    throw new Error('The output token limit must exceed the reasoning token budget.');
+  const enabledInput = input('reasoning-enabled').trim();
+  const enabled = enabledInput
+    ? boolean(enabledInput, 'reasoning-enabled')
+    : object(options.reasoning)
+      ? options.reasoning.enabled
+      : undefined;
+  if (enabled !== undefined && typeof enabled !== 'boolean')
+    throw new Error('reasoning.enabled must be a JSON boolean.');
+  let reasoning: Record<string, unknown>;
+  if (enabled === false) {
+    // Disabled reasoning ignores all other reasoning settings, including invalid values.
+    reasoning = { enabled: false };
+  } else {
+    if ('reasoning' in options && !object(options.reasoning)) throw new Error('reasoning must be an object.');
+    reasoning = { ...(options.reasoning as Record<string, unknown> | undefined) };
+    if (enabled !== undefined) reasoning.enabled = enabled;
+    for (const key of ['effort', 'exclude', 'max_tokens']) {
+      const name = `reasoning-${key.replace('_', '-')}`;
+      const value = input(name).trim();
+      if (value)
+        reasoning[key] =
+          key === 'max_tokens' ? Number(value) : key === 'effort' ? value : boolean(value, name);
+    }
+    if ('max_tokens' in reasoning) {
+      number(reasoning.max_tokens, 'reasoning-max-tokens', 1);
+      delete reasoning.effort;
+    }
+    if (
+      'effort' in reasoning &&
+      (typeof reasoning.effort !== 'string' ||
+        !['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(reasoning.effort))
+    ) {
+      throw new Error('reasoning-effort must be none, minimal, low, medium, high, xhigh, or max.');
+    }
+    if ('exclude' in reasoning && typeof reasoning.exclude !== 'boolean')
+      throw new Error('reasoning.exclude must be a JSON boolean.');
+    const budget = options.max_tokens ?? options.max_completion_tokens;
+    if (
+      typeof budget === 'number' &&
+      typeof reasoning.max_tokens === 'number' &&
+      reasoning.max_tokens >= budget
+    ) {
+      throw new Error('The output token limit must exceed the reasoning token budget.');
+    }
+    if (reasoning.effort === 'none') {
+      reasoning = { enabled: false };
+      notice?.('reasoning disabled because effort is set to none');
+    }
   }
   if (Object.keys(reasoning).length) options.reasoning = reasoning;
   else delete options.reasoning;

@@ -54,7 +54,7 @@ test('explicit zero and false survive named overrides and nested JSON merging', 
     top_p: 0.8,
     seed: 0,
     provider: { require_parameters: true },
-    reasoning: { enabled: false, exclude: false },
+    reasoning: { enabled: false },
   });
 });
 
@@ -68,6 +68,109 @@ test('reasoning effort overrides its JSON field without dropping other reasoning
     max_tokens: 2000,
     reasoning: { max_tokens: 1000 },
   });
+});
+
+const reasoningBudgets: [string, Record<string, string>][] = [
+  ['both named inputs', { 'reasoning-effort': 'high', 'reasoning-max-tokens': '1000' }],
+  ['both JSON fields', { 'request-options': '{"reasoning":{"effort":"high","max_tokens":1000}}' }],
+  [
+    'named budget and JSON effort',
+    { 'reasoning-max-tokens': '1000', 'request-options': '{"reasoning":{"effort":"high","max_tokens":500}}' },
+  ],
+  [
+    'JSON budget and named effort',
+    { 'reasoning-effort': 'high', 'request-options': '{"reasoning":{"max_tokens":1000}}' },
+  ],
+  ['ignored invalid effort', { 'reasoning-effort': 'extreme', 'reasoning-max-tokens': '1000' }],
+  [
+    'ignored none effort with reasoning enabled',
+    { 'reasoning-effort': 'none', 'reasoning-max-tokens': '1000' },
+  ],
+];
+for (const [label, overrides] of reasoningBudgets)
+  test(`reasoning token budget takes precedence: ${label}`, () => {
+    const notices: string[] = [];
+    const payload = buildRequest(
+      config(
+        {
+          ...overrides,
+          'max-tokens': '2000',
+          'reasoning-enabled': 'true',
+          'reasoning-exclude': 'true',
+        },
+        (message) => notices.push(message),
+      ),
+      patch(),
+    );
+    assert.deepEqual(payload.reasoning, { max_tokens: 1000, enabled: true, exclude: true });
+    assert.equal(payload.max_tokens, 2000);
+    assert.deepEqual(notices, []);
+  });
+
+const disabledReasoning: [string, Record<string, string>][] = [
+  [
+    'named false overrides JSON settings and ignores an excessive budget',
+    {
+      'reasoning-enabled': 'false',
+      'request-options':
+        '{"reasoning":{"enabled":true,"effort":"high","max_tokens":2000,"exclude":true,"extra":42}}',
+    },
+  ],
+  [
+    'JSON false ignores invalid named settings',
+    {
+      'request-options': '{"reasoning":{"enabled":false}}',
+      'reasoning-effort': 'invalid',
+      'reasoning-max-tokens': 'invalid',
+      'reasoning-exclude': 'invalid',
+    },
+  ],
+  [
+    'JSON false ignores invalid JSON settings',
+    { 'request-options': '{"reasoning":{"enabled":false,"effort":[],"max_tokens":-1,"exclude":"invalid"}}' },
+  ],
+  [
+    'named false ignores malformed reasoning object',
+    { 'reasoning-enabled': 'false', 'request-options': '{"reasoning":[]}' },
+  ],
+  ['explicit false takes precedence over none', { 'reasoning-enabled': 'false', 'reasoning-effort': 'none' }],
+];
+for (const [label, overrides] of disabledReasoning)
+  test(`disabled reasoning: ${label}`, () => {
+    const notices: string[] = [];
+    const payload = buildRequest(
+      config({ ...overrides, 'max-tokens': '1000' }, (message) => notices.push(message)),
+      patch(),
+    );
+    assert.deepEqual(payload.reasoning, { enabled: false });
+    assert.equal(payload.max_tokens, 1000);
+    assert.deepEqual(notices, []);
+  });
+
+for (const overrides of [
+  { 'reasoning-enabled': 'true', 'reasoning-effort': 'none' },
+  { 'request-options': '{"reasoning":{"enabled":true,"effort":"none","exclude":true}}' },
+  { 'reasoning-enabled': 'true', 'request-options': '{"reasoning":{"effort":"none"}}' },
+  { 'reasoning-effort': 'none', 'request-options': '{"reasoning":{"enabled":true}}' },
+  { 'reasoning-effort': 'none' },
+] as Record<string, string>[])
+  test(`none effort disables reasoning and reports why: ${JSON.stringify(overrides)}`, () => {
+    const notices: string[] = [];
+    const payload = buildRequest(
+      config(overrides, (message) => notices.push(message)),
+      patch(),
+    );
+    assert.deepEqual(payload.reasoning, { enabled: false });
+    assert.deepEqual(notices, ['reasoning disabled because effort is set to none']);
+  });
+
+test('named true overrides JSON false and preserves active reasoning settings', () => {
+  const cfg = config({
+    'reasoning-enabled': 'true',
+    'reasoning-exclude': 'false',
+    'request-options': '{"reasoning":{"enabled":false,"effort":"high","exclude":true}}',
+  });
+  assert.deepEqual(cfg.options.reasoning, { enabled: true, effort: 'high', exclude: false });
 });
 
 test('patterns accept commas and newlines, and empty exclusions disable filtering', () => {
@@ -97,11 +200,14 @@ const invalid: [string, Record<string, string>][] = [
   ['JSON effort array', { 'request-options': '{"reasoning":{"effort":["high"]}}' }],
   ['invalid boolean', { 'reasoning-enabled': 'yes' }],
   ['JSON boolean string', { 'request-options': '{"reasoning":{"exclude":"false"}}' }],
+  ['JSON enabled string', { 'request-options': '{"reasoning":{"enabled":"false"}}' }],
   ['JSON numeric string', { 'request-options': '{"temperature":"0"}' }],
   ['reasoning array', { 'request-options': '{"reasoning":[]}' }],
-  ['effort and budget', { 'reasoning-effort': 'high', 'reasoning-max-tokens': '1000' }],
-  ['disabled with effort', { 'reasoning-enabled': 'false', 'reasoning-effort': 'high' }],
-  ['enabled with none', { 'reasoning-enabled': 'true', 'reasoning-effort': 'none' }],
+  ['invalid reasoning budget with effort', { 'reasoning-effort': 'high', 'reasoning-max-tokens': '0' }],
+  [
+    'JSON reasoning budget string',
+    { 'request-options': '{"reasoning":{"effort":"high","max_tokens":"1000"}}' },
+  ],
   ['insufficient output budget', { 'max-tokens': '100', 'reasoning-max-tokens': '100' }],
   ['two output budgets', { 'max-tokens': '100', 'request-options': '{"max_completion_tokens":200}' }],
   ['URL credentials', { 'base-url': 'https://key@example.test/v1' }],

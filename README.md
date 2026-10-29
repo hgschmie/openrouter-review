@@ -4,7 +4,7 @@ A TypeScript GitHub Action that sends a filtered pull request diff to OpenRouter
 
 ## Usage
 
-Store your OpenRouter key as the repository secret `OPENROUTER_API_KEY`. After publishing this repository, replace `OWNER/openrouter-review@1.0.0` with its repository and release tag (or pinned commit SHA).
+Store your OpenRouter key as the repository secret `OPENROUTER_API_KEY`. Use the release tag shown below, or pin the action to a commit SHA.
 
 ```yaml
 name: Code review
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: OWNER/openrouter-review@1.0.0
+      - uses: hgschmie/openrouter-review@v1.1.0
         with:
           api-key: ${{ secrets.OPENROUTER_API_KEY }}
           model: deepseek/deepseek-v4-flash
@@ -49,10 +49,10 @@ The action also accepts `pull_request` events where the workflow has the require
 | `user-prompt`          | See below                                 | Text preceding the diff; accepts multiline text.                                              |
 | `temperature`          | Unset                                     | Number from 0 to 2.                                                                           |
 | `max-tokens`           | Unset                                     | Maximum generated tokens, including reasoning on most providers.                              |
-| `reasoning-effort`     | Unset                                     | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`; support varies by model.       |
-| `reasoning-enabled`    | Unset                                     | Explicit `true` or `false`.                                                                   |
+| `reasoning-effort`     | Unset                                     | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`; ignored when a reasoning token budget is set. Support varies by model. |
+| `reasoning-enabled`    | Unset                                     | Explicit `true` or `false`; `false` ignores all other reasoning settings.                      |
 | `reasoning-exclude`    | Unset                                     | `true` omits returned reasoning; it does not disable reasoning or its cost.                   |
-| `reasoning-max-tokens` | Unset                                     | Positive reasoning token budget; use instead of `reasoning-effort`.                           |
+| `reasoning-max-tokens` | Unset                                     | Positive reasoning token budget; takes precedence over `reasoning-effort`.                    |
 | `request-options`      | `{}`                                      | JSON object of additional request parameters.                                                 |
 | `include-patterns`     | Empty (all files)                         | Comma or newline separated file globs.                                                        |
 | `exclude-patterns`     | `pnpm-lock.yaml,package-lock.json,*.lock` | Comma or newline separated file globs. Set to `''` to disable.                                |
@@ -64,7 +64,13 @@ The action also accepts `pull_request` events where the workflow has the require
 
 Unset generation options are omitted from the request, allowing the provider's defaults to apply. Explicit `false` and `0` remain intact. Model-specific capabilities are validated by OpenRouter, rather than maintained in a local model catalog. A custom base URL must accept the same chat completion format; the action does not translate provider-specific APIs.
 
-Named inputs override corresponding fields in `request-options`, including individual fields within `reasoning`. For example:
+Named inputs override corresponding fields in `request-options`, including individual fields within `reasoning`. After merging, the following precedence applies whether settings come from named inputs or `request-options`:
+
+- `reasoning-enabled: false` ignores all other reasoning settings, including invalid values, and sends only `reasoning: { "enabled": false }`.
+- Otherwise, a reasoning token budget takes precedence over effort: if `reasoning.max_tokens` is set, `reasoning.effort` is ignored and omitted from the API request.
+- Otherwise, `reasoning-effort: none` disables reasoning even when `reasoning-enabled: true`. The action sends only `reasoning: { "enabled": false }` and reports the notice `reasoning disabled because effort is set to none`.
+
+For example:
 
 ```yaml
 with:
@@ -83,7 +89,7 @@ with:
     }
 ```
 
-The action owns `model`, `messages`, `prompt`, `stream`, `stream_options`, `n`, and tool/function-calling fields; setting these through `request-options` is rejected. The request always uses `stream: false`. Set either `max_tokens` or `max_completion_tokens`, not both. A reasoning budget must be smaller than the configured output limit. Contradictory reasoning controls fail before contacting either API.
+The action owns `model`, `messages`, `prompt`, `stream`, `stream_options`, `n`, and tool/function-calling fields; setting these through `request-options` is rejected. The request always uses `stream: false`. Set either `max_tokens` or `max_completion_tokens`, not both. When reasoning is active, its token budget must be smaller than the configured output limit. Invalid settings that remain after applying the precedence rules fail before contacting either API.
 
 See OpenRouter's [request parameters](https://openrouter.ai/docs/api_reference/parameters), [reasoning controls](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens), and [provider routing](https://openrouter.ai/docs/guides/routing/provider-selection). Not all providers enforce every parameter; `provider.require_parameters` can restrict routing to providers that support the requested parameters.
 
@@ -164,7 +170,7 @@ Source modules cover configuration, diff filtering, GitHub operations, OpenRoute
 
 This repository uses Semantic Versioning: `MAJOR.MINOR.PATCH`. Breaking changes to the action's inputs, outputs, or supported behavior require a major release; backward-compatible features increment the minor version, and backward-compatible fixes increment the patch version.
 
-To release, update the version in `package.json` and `package-lock.json`, commit the tested sources, lockfile and generated `dist/` files, then create an annotated version tag without a `v` prefix (for example `1.0.0`). Publish the commit and tag when ready. Released version tags are immutable. No npm publication is needed.
+To release, update the version in `package.json` and `package-lock.json`, commit the tested sources, lockfile and generated `dist/` files, then create an annotated version tag with a `v` prefix (for example `v1.1.0`). Publish the commit and tag when ready. Released version tags are immutable. No npm publication is needed.
 
 ----
 

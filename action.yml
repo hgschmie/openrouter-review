@@ -27,13 +27,13 @@ inputs:
   max-tokens:
     description: Optional output token limit, including reasoning on most providers.
   reasoning-effort:
-    description: Optional none, minimal, low, medium, high, xhigh, or max; model support varies.
+    description: Optional none, minimal, low, medium, high, xhigh, or max. Ignored when reasoning is disabled or a reasoning token budget is set; otherwise none disables reasoning with a notice. Model support varies.
   reasoning-enabled:
-    description: Optional true or false; omitted when unset.
+    description: Optional true or false; false ignores all other reasoning settings. Omitted when unset.
   reasoning-exclude:
     description: Optional true to omit returned reasoning; this does not disable reasoning.
   reasoning-max-tokens:
-    description: Optional reasoning token budget; use instead of reasoning-effort.
+    description: Optional positive reasoning token budget; takes precedence over reasoning-effort unless reasoning-enabled is false.
   request-options:
     description: JSON object of additional API parameters. Explicit named inputs take precedence.
     default: '{}'

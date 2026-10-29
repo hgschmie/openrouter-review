@@ -13,9 +13,49 @@ import { completion, patch } from './helpers.ts';
 
 const exec = promisify(execFile);
 
-for (const diffMode of ['normal', 'oversized-chunked', 'oversized-gzip'] as const)
+const scenarios: {
+  name: string;
+  diffMode: 'normal' | 'oversized-chunked' | 'oversized-gzip';
+  inputs?: Record<string, string>;
+  reasoning?: Record<string, unknown>;
+  notice?: string;
+}[] = [
+  { name: 'normal diff', diffMode: 'normal' },
+  { name: 'oversized chunked diff', diffMode: 'oversized-chunked' },
+  { name: 'oversized gzip diff', diffMode: 'oversized-gzip' },
+  {
+    name: 'disabled reasoning with conflicting settings',
+    diffMode: 'normal',
+    inputs: {
+      'reasoning-enabled': 'false',
+      'reasoning-max-tokens': 'invalid',
+      'reasoning-exclude': 'invalid',
+    },
+    reasoning: { enabled: false },
+  },
+  {
+    name: 'none effort overriding enabled reasoning',
+    diffMode: 'normal',
+    inputs: { 'reasoning-enabled': 'true', 'reasoning-effort': 'none' },
+    reasoning: { enabled: false },
+    notice: 'reasoning disabled because effort is set to none',
+  },
+  {
+    name: 'reasoning budget overriding effort',
+    diffMode: 'normal',
+    inputs: { 'reasoning-max-tokens': '1000', 'max-tokens': '2000' },
+    reasoning: { max_tokens: 1000, exclude: false },
+  },
+];
+for (const {
+  name,
+  diffMode,
+  inputs = {},
+  reasoning = { effort: 'high', exclude: false },
+  notice,
+} of scenarios)
   test(
-    `standalone bundle handles ${diffMode} diffs through real HTTP and exports action outputs`,
+    `standalone bundle handles ${name} through real HTTP and exports action outputs`,
     { timeout: 30_000 },
     async () => {
       const dir = await mkdtemp(join(tmpdir(), 'openrouter-review-test-'));
@@ -102,10 +142,16 @@ for (const diffMode of ['normal', 'oversized-chunked', 'oversized-gzip'] as cons
           'INPUT_API-KEY': 'fake-model-key',
           'INPUT_GITHUB-TOKEN': 'fake-github-key',
           'INPUT_BASE-URL': `${base}/api/v1`,
+          'INPUT_REASONING-ENABLED': '',
           'INPUT_REASONING-EFFORT': 'high',
           'INPUT_REASONING-EXCLUDE': 'false',
+          'INPUT_REASONING-MAX-TOKENS': '',
+          'INPUT_MAX-TOKENS': '',
           'INPUT_MAX-DIFF-BYTES': diffMode === 'normal' ? defaults['max-diff-bytes'] : '65536',
           INPUT_TEMPERATURE: '0',
+          ...Object.fromEntries(
+            Object.entries(inputs).map(([name, value]) => [`INPUT_${name.toUpperCase()}`, value]),
+          ),
         };
         const result = await exec(process.execPath, [join(dir, 'index.js')], {
           cwd: dir,
@@ -113,6 +159,8 @@ for (const diffMode of ['normal', 'oversized-chunked', 'oversized-gzip'] as cons
           timeout: 20_000,
         });
         assert.deepEqual(errors, []);
+        if (notice) assert.ok(result.stdout.includes(`::notice::${notice}`));
+        else assert.doesNotMatch(result.stdout, /reasoning disabled because effort is set to none/);
         // @actions/core writes platform-native line endings to GITHUB_OUTPUT.
         const outputs = (await readFile(join(dir, 'outputs'), 'utf8')).replace(/\r\n/g, '\n');
         if (diffMode !== 'normal') {
@@ -125,7 +173,8 @@ for (const diffMode of ['normal', 'oversized-chunked', 'oversized-gzip'] as cons
           return;
         }
         assert.match(result.stdout, /Review published/);
-        assert.deepEqual(modelRequest?.reasoning, { effort: 'high', exclude: false });
+        assert.deepEqual(modelRequest?.reasoning, reasoning);
+        if (inputs['max-tokens']) assert.equal(modelRequest?.max_tokens, Number(inputs['max-tokens']));
         assert.equal(modelRequest?.temperature, 0);
         assert.equal(modelRequest?.stream, false);
         assert.doesNotMatch(JSON.stringify(modelRequest?.messages), /package-lock/);

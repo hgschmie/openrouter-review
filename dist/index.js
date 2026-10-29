@@ -24606,7 +24606,7 @@ function boolean(value, name) {
   if (value === false || value === "false") return false;
   throw new Error(`${name} must be true or false.`);
 }
-function readConfig(getInput2) {
+function readConfig(getInput2, notice2) {
   const input = (name) => getInput2(name) || defaults2[name] || "";
   const required = (name) => {
     const value = input(name).trim();
@@ -24653,30 +24653,40 @@ function readConfig(getInput2) {
   }
   if ("max_tokens" in options && "max_completion_tokens" in options)
     throw new Error("Set only one of max_tokens and max_completion_tokens.");
-  if ("reasoning" in options && !object(options.reasoning)) throw new Error("reasoning must be an object.");
-  const reasoning = { ...options.reasoning };
-  for (const key of ["effort", "enabled", "exclude", "max_tokens"]) {
-    const name = `reasoning-${key.replace("_", "-")}`;
-    const value = input(name).trim();
-    if (value)
-      reasoning[key] = key === "max_tokens" ? Number(value) : key === "effort" ? value : boolean(value, name);
-  }
-  if ("effort" in reasoning && (typeof reasoning.effort !== "string" || !["none", "minimal", "low", "medium", "high", "xhigh", "max"].includes(reasoning.effort))) {
-    throw new Error("reasoning-effort must be none, minimal, low, medium, high, xhigh, or max.");
-  }
-  for (const key of ["enabled", "exclude"]) {
-    if (key in reasoning && typeof reasoning[key] !== "boolean")
-      throw new Error(`reasoning.${key} must be a JSON boolean.`);
-  }
-  if ("max_tokens" in reasoning) number(reasoning.max_tokens, "reasoning-max-tokens", 1);
-  if ("effort" in reasoning && "max_tokens" in reasoning)
-    throw new Error("Set reasoning-effort or reasoning-max-tokens, not both.");
-  if (reasoning.enabled === false && ("effort" in reasoning && reasoning.effort !== "none" || "max_tokens" in reasoning) || reasoning.enabled === true && reasoning.effort === "none") {
-    throw new Error("reasoning-enabled conflicts with the configured reasoning effort or budget.");
-  }
-  const budget = options.max_tokens ?? options.max_completion_tokens;
-  if (typeof budget === "number" && typeof reasoning.max_tokens === "number" && reasoning.max_tokens >= budget) {
-    throw new Error("The output token limit must exceed the reasoning token budget.");
+  const enabledInput = input("reasoning-enabled").trim();
+  const enabled = enabledInput ? boolean(enabledInput, "reasoning-enabled") : object(options.reasoning) ? options.reasoning.enabled : void 0;
+  if (enabled !== void 0 && typeof enabled !== "boolean")
+    throw new Error("reasoning.enabled must be a JSON boolean.");
+  let reasoning;
+  if (enabled === false) {
+    reasoning = { enabled: false };
+  } else {
+    if ("reasoning" in options && !object(options.reasoning)) throw new Error("reasoning must be an object.");
+    reasoning = { ...options.reasoning };
+    if (enabled !== void 0) reasoning.enabled = enabled;
+    for (const key of ["effort", "exclude", "max_tokens"]) {
+      const name = `reasoning-${key.replace("_", "-")}`;
+      const value = input(name).trim();
+      if (value)
+        reasoning[key] = key === "max_tokens" ? Number(value) : key === "effort" ? value : boolean(value, name);
+    }
+    if ("max_tokens" in reasoning) {
+      number(reasoning.max_tokens, "reasoning-max-tokens", 1);
+      delete reasoning.effort;
+    }
+    if ("effort" in reasoning && (typeof reasoning.effort !== "string" || !["none", "minimal", "low", "medium", "high", "xhigh", "max"].includes(reasoning.effort))) {
+      throw new Error("reasoning-effort must be none, minimal, low, medium, high, xhigh, or max.");
+    }
+    if ("exclude" in reasoning && typeof reasoning.exclude !== "boolean")
+      throw new Error("reasoning.exclude must be a JSON boolean.");
+    const budget = options.max_tokens ?? options.max_completion_tokens;
+    if (typeof budget === "number" && typeof reasoning.max_tokens === "number" && reasoning.max_tokens >= budget) {
+      throw new Error("The output token limit must exceed the reasoning token budget.");
+    }
+    if (reasoning.effort === "none") {
+      reasoning = { enabled: false };
+      notice2?.("reasoning disabled because effort is set to none");
+    }
   }
   if (Object.keys(reasoning).length) options.reasoning = reasoning;
   else delete options.reasoning;
@@ -27273,7 +27283,7 @@ async function main() {
     const secret = getInput(name);
     if (secret) setSecret(secret);
   }
-  const config = readConfig((name) => getInput(name, { trimWhitespace: false }));
+  const config = readConfig((name) => getInput(name, { trimWhitespace: false }), notice);
   const trigger = selectTrigger(context2, config);
   const result = "skip" in trigger ? { skippedReason: trigger.skip } : await runReview(config, trigger, createGitHub(config, context2.repo, trigger.number));
   setOutput("review-url", result.reviewUrl ?? "");

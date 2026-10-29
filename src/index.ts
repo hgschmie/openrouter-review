@@ -9,7 +9,7 @@ async function main(): Promise<void> {
     const secret = core.getInput(name);
     if (secret) core.setSecret(secret);
   }
-  const config = readConfig((name) => core.getInput(name, { trimWhitespace: false }));
+  const config = readConfig((name) => core.getInput(name, { trimWhitespace: false }), core.notice);
   const trigger = selectTrigger(context, config);
   const result =
     'skip' in trigger

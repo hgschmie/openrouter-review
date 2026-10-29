@@ -1,13 +1,13 @@
 import { defaults, readConfig } from '../src/config.ts';
 
-export function config(overrides: Record<string, string> = {}) {
+export function config(overrides: Record<string, string> = {}, notice?: (message: string) => void) {
   const values: Record<string, string> = {
     ...defaults,
     'api-key': 'model-test-key',
     'github-token': 'github-test-key',
     ...overrides,
   };
-  return readConfig((name) => values[name] ?? '');
+  return readConfig((name) => values[name] ?? '', notice);
 }
 
 export const patch = (path = 'src/main.ts') =>
