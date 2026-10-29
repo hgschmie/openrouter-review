@@ -1,0 +1,68 @@
+name: OpenRouter Review
+description: Review pull request diffs with configurable OpenRouter models and prompts.
+branding:
+  icon: eye
+  color: purple
+inputs:
+  api-key:
+    description: OpenRouter API key, or the key for your configured endpoint.
+    required: true
+  github-token:
+    description: GitHub token with pull-requests write permission.
+    default: ${{ github.token }}
+  base-url:
+    description: Chat API base URL; /chat/completions is appended.
+    default: https://openrouter.ai/api/v1
+  model:
+    description: OpenRouter model ID.
+    default: deepseek/deepseek-v4-flash
+  sys-prompt:
+    description: System prompt for the review.
+    default: 'You are a professional code review assistant responsible for analyzing code changes in GitHub Pull Requests. Identify potential issues such as code style violations, logical errors, security vulnerabilities, and provide improvement suggestions. Clearly list the problems and recommendations in a concise manner.'
+  user-prompt:
+    description: User prompt preceding the diff.
+    default: Please review the following code changes
+  temperature:
+    description: Optional sampling temperature (0 to 2); omitted when unset.
+  max-tokens:
+    description: Optional output token limit, including reasoning on most providers.
+  reasoning-effort:
+    description: Optional none, minimal, low, medium, high, xhigh, or max; model support varies.
+  reasoning-enabled:
+    description: Optional true or false; omitted when unset.
+  reasoning-exclude:
+    description: Optional true to omit returned reasoning; this does not disable reasoning.
+  reasoning-max-tokens:
+    description: Optional reasoning token budget; use instead of reasoning-effort.
+  request-options:
+    description: JSON object of additional API parameters. Explicit named inputs take precedence.
+    default: '{}'
+  include-patterns:
+    description: Comma or newline separated globs to include; empty includes all files.
+  exclude-patterns:
+    description: Comma or newline separated globs to exclude; exclusions win.
+    default: pnpm-lock.yaml,package-lock.json,*.lock
+  max-diff-chars:
+    description: Maximum filtered diff size in Unicode code points; 0 disables the limit.
+    default: '100000'
+  max-diff-bytes:
+    description: Maximum raw diff download in decoded bytes before filtering. Must be positive; oversized reviews are skipped.
+    default: '20971520'
+  timeout-seconds:
+    description: Timeout per HTTP attempt (1 to 1800 seconds).
+    default: '180'
+  watch-mention:
+    description: Optional literal mention that triggers a review on an issue_comment event.
+  allowed-associations:
+    description: Author associations permitted to trigger reviews by comment.
+    default: OWNER,MEMBER,COLLABORATOR
+outputs:
+  review-url:
+    description: URL of the new or already existing review.
+  reviewed-sha:
+    description: Commit SHA associated with a published or already existing review.
+  skipped-reason:
+    description: Reason no new review was published; empty on success.
+runs:
+  using: node24
+  main: dist/index.js
