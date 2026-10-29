@@ -166,6 +166,12 @@ This repository uses Semantic Versioning: `MAJOR.MINOR.PATCH`. Breaking changes 
 
 To release, update the version in `package.json` and `package-lock.json`, commit the tested sources, lockfile and generated `dist/` files, then create an annotated version tag without a `v` prefix (for example `1.0.0`). Publish the commit and tag when ready. Released version tags are immutable. No npm publication is needed.
 
+----
+
 ## License
 
-Copyright (c) 2026 OpenRouter Review contributors. Licensed under the [Apache License 2.0](LICENSE). Prompt defaults and selected behavior are adapted from [hustcer/deepseek-review](https://github.com/hustcer/deepseek-review) and [hgschmie's fork](https://github.com/hgschmie/github-deepseek-review); their MIT license is preserved in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Copyright (C) 2026 Henning Schmiedehausen. Licensed under the [Apache License 2.0](LICENSE).
+
+Prompt defaults and selected behavior are adapted from [hustcer/deepseek-review](https://github.com/hustcer/deepseek-review) which is under MIT license, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Developed use AI tools. If you object to the use of AI tooling for software development, you are free to not use this action.
