@@ -165,6 +165,7 @@ for (const {
         const outputs = (await readFile(join(dir, 'outputs'), 'utf8')).replace(/\r\n/g, '\n');
         if (diffMode !== 'normal') {
           assert.match(result.stdout, /Raw diff exceeds max-diff-bytes/);
+          assert.doesNotMatch(result.stdout, /Requesting model review/);
           assert.equal(modelRequest, undefined);
           assert.equal(posted, undefined);
           assert.equal(requests.filter((r) => r.method === 'POST').length, 0);
@@ -173,6 +174,7 @@ for (const {
           return;
         }
         assert.match(result.stdout, /Review published/);
+        assert.ok(result.stdout.includes('Requesting model review for PR #42: head HEAD, base BASE.'));
         assert.deepEqual(modelRequest?.reasoning, reasoning);
         if (inputs['max-tokens']) assert.equal(modelRequest?.max_tokens, Number(inputs['max-tokens']));
         assert.equal(modelRequest?.temperature, 0);

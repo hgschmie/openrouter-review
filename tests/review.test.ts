@@ -51,10 +51,18 @@ function fixture() {
 test('full flow sends a filtered diff and publishes the answer on the captured commit', async () => {
   const f = fixture();
   f.github.getDiff = async () => patch() + patch('package-lock.json');
-  const result = await runReview(config(), f.trigger, f.github, async (cfg, request) => {
-    assert.doesNotMatch(JSON.stringify(request), /package-lock/);
-    return f.complete(cfg, request);
-  });
+  const messages: string[] = [];
+  const result = await runReview(
+    config(),
+    f.trigger,
+    f.github,
+    async (cfg, request) => {
+      assert.deepEqual(messages, ['Requesting model review for PR #42: head HEAD, base BASE.']);
+      assert.doesNotMatch(JSON.stringify(request), /package-lock/);
+      return f.complete(cfg, request);
+    },
+    (message) => messages.push(message),
+  );
   assert.deepEqual(result, { reviewUrl: 'https://github.test/review/1', reviewedSha: 'HEAD' });
   assert.equal(f.seen.writes, 1);
   assert.equal(f.seen.sha, 'HEAD');
@@ -131,11 +139,16 @@ test('size limit counts Unicode code points; zero disables it', async () => {
 
 test('detects a changed revision before making the paid request', async () => {
   const f = fixture();
+  const messages: string[] = [];
   f.github.getDiff = async () => {
     f.pr.head = 'NEW';
     return patch();
   };
-  assert.match((await runReview(config(), f.trigger, f.github, f.complete)).skippedReason!, /fetching/);
+  const result = await runReview(config(), f.trigger, f.github, f.complete, (message) =>
+    messages.push(message),
+  );
+  assert.match(result.skippedReason!, /fetching/);
+  assert.deepEqual(messages, []);
   assert.equal(f.seen.modelCalls, 0);
 });
 

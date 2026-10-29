@@ -34,6 +34,7 @@ export async function runReview(
   trigger: Trigger,
   github: PrClient,
   complete = completeReview,
+  info: (message: string) => void = () => {},
 ): Promise<ReviewResult> {
   const pr = await github.getPullRequest();
   const skip = skipReason(pr);
@@ -87,6 +88,7 @@ export async function runReview(
   const current = await github.getPullRequest();
   if (current.head !== pr.head || current.base !== pr.base || skipReason(current))
     return { skippedReason: 'Pull request changed while fetching its diff.' };
+  info(`Requesting model review for PR #${trigger.number}: head ${pr.head}, base ${pr.base}.`);
   const completion = await complete(config, request);
   const body = formatReview(completion, marker);
   const latest = await github.getPullRequest();

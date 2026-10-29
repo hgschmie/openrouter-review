@@ -158,7 +158,7 @@ The action's `timeout-seconds` defaults to 180 per HTTP attempt, including readi
 | `reviewed-sha`   | Commit associated with a published/existing review; otherwise empty. |
 | `skipped-reason` | Reason no new review was posted; empty on success.                   |
 
-The job summary reports the outcome and links to the review. API keys are registered with GitHub's log masker. The action does not intentionally log prompts, diffs or full model responses, but upstream error messages can appear in logs; inspect them before sharing. See [data handling and retention](PRIVACY.md).
+Immediately before requesting a model review, the action logs the PR number and full head and base commit SHAs for the captured diff. This identifies the revision being reviewed even if the request later fails. The job summary reports the outcome and links to the review. API keys are registered with GitHub's log masker. The action does not intentionally log prompts, diffs or full model responses, but upstream error messages can appear in logs; inspect them before sharing. See [data handling and retention](PRIVACY.md).
 
 ## Appropriate use and limitations
 

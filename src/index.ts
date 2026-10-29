@@ -14,7 +14,13 @@ async function main(): Promise<void> {
   const result =
     'skip' in trigger
       ? { skippedReason: trigger.skip }
-      : await runReview(config, trigger, createGitHub(config, context.repo, trigger.number));
+      : await runReview(
+          config,
+          trigger,
+          createGitHub(config, context.repo, trigger.number),
+          undefined,
+          core.info,
+        );
   core.setOutput('review-url', result.reviewUrl ?? '');
   core.setOutput('reviewed-sha', result.reviewedSha ?? '');
   core.setOutput('skipped-reason', result.skippedReason ?? '');

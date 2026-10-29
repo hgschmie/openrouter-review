@@ -27240,7 +27240,8 @@ function skipReason(pr) {
 ${pr.body}`))
     return "Pull request requests skipping the review.";
 }
-async function runReview(config, trigger, github, complete = completeReview) {
+async function runReview(config, trigger, github, complete = completeReview, info2 = () => {
+}) {
   const pr = await github.getPullRequest();
   const skip = skipReason(pr);
   if (skip) return { skippedReason: skip };
@@ -27291,6 +27292,7 @@ async function runReview(config, trigger, github, complete = completeReview) {
   const current = await github.getPullRequest();
   if (current.head !== pr.head || current.base !== pr.base || skipReason(current))
     return { skippedReason: "Pull request changed while fetching its diff." };
+  info2(`Requesting model review for PR #${trigger.number}: head ${pr.head}, base ${pr.base}.`);
   const completion = await complete(config, request2);
   const body = formatReview(completion, marker);
   const latest = await github.getPullRequest();
@@ -27310,7 +27312,13 @@ async function main() {
   }
   const config = readConfig((name) => getInput(name, { trimWhitespace: false }), notice);
   const trigger = selectTrigger(context2, config);
-  const result = "skip" in trigger ? { skippedReason: trigger.skip } : await runReview(config, trigger, createGitHub(config, context2.repo, trigger.number));
+  const result = "skip" in trigger ? { skippedReason: trigger.skip } : await runReview(
+    config,
+    trigger,
+    createGitHub(config, context2.repo, trigger.number),
+    void 0,
+    info
+  );
   setOutput("review-url", result.reviewUrl ?? "");
   setOutput("reviewed-sha", result.reviewedSha ?? "");
   setOutput("skipped-reason", result.skippedReason ?? "");
