@@ -19,10 +19,11 @@ const scenarios: {
   inputs?: Record<string, string>;
   reasoning?: Record<string, unknown>;
   notice?: string;
-  usage?: boolean;
+  usage?: boolean | 'without-reasoning';
 }[] = [
   { name: 'normal diff', diffMode: 'normal' },
   { name: 'response without usage', diffMode: 'normal', usage: false },
+  { name: 'usage without reasoning count', diffMode: 'normal', usage: 'without-reasoning' },
   { name: 'oversized chunked diff', diffMode: 'oversized-chunked' },
   { name: 'oversized gzip diff', diffMode: 'oversized-gzip' },
   {
@@ -84,7 +85,10 @@ for (const {
                     usage: {
                       prompt_tokens: 100,
                       completion_tokens: 50,
-                      completion_tokens_details: { reasoning_tokens: reasoning.enabled === false ? 0 : 30 },
+                      completion_tokens_details:
+                        usage === 'without-reasoning'
+                          ? {}
+                          : { reasoning_tokens: reasoning.enabled === false ? 0 : 30 },
                       total_tokens: 150,
                     },
                   }
@@ -190,9 +194,12 @@ for (const {
           return;
         }
         assert.match(result.stdout, /Review published/);
-        const usageLine = usage
-          ? `prompt tokens: 100 / completion tokens: ${reasoning.enabled === false ? 50 : 20} / reasoning tokens: ${reasoning.enabled === false ? 0 : 30}`
-          : 'prompt tokens: unavailable / completion tokens: unavailable / reasoning tokens: unavailable';
+        const usageLine =
+          usage === 'without-reasoning'
+            ? 'prompt tokens: 100 / completion tokens: 50'
+            : usage
+              ? `prompt tokens: 100 / completion tokens: ${reasoning.enabled === false ? 50 : 20} / reasoning tokens: ${reasoning.enabled === false ? 0 : 30}`
+              : 'prompt tokens: unavailable / completion tokens: unavailable';
         assert.equal(result.stdout.trimEnd().split(/\r?\n/).at(-1), usageLine);
         assert.ok(result.stdout.includes('Requesting model review for PR #42: head HEAD, base BASE.'));
         assert.deepEqual(modelRequest?.reasoning, reasoning);

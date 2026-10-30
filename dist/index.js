@@ -27146,9 +27146,11 @@ function formatTokenUsage(usage) {
   const prompt = count(data.prompt_tokens);
   const totalCompletion = count(data.completion_tokens);
   const details = object(data.completion_tokens_details) ? data.completion_tokens_details : {};
-  const reasoning = count(details.reasoning_tokens);
+  const missingReasoning = details.reasoning_tokens == null;
+  const reasoning = missingReasoning ? 0 : count(details.reasoning_tokens);
   const completion = totalCompletion !== void 0 && reasoning !== void 0 && reasoning <= totalCompletion ? totalCompletion - reasoning : void 0;
-  return `prompt tokens: ${prompt ?? "unavailable"} / completion tokens: ${completion ?? "unavailable"} / reasoning tokens: ${reasoning ?? "unavailable"}`;
+  const line = `prompt tokens: ${prompt ?? "unavailable"} / completion tokens: ${completion ?? "unavailable"}`;
+  return missingReasoning ? line : `${line} / reasoning tokens: ${reasoning ?? "unavailable"}`;
 }
 async function completeReview(config, payload, fetchImpl = fetch, wait, reportUsage) {
   return withRetries(async () => {

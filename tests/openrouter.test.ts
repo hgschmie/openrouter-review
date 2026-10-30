@@ -26,18 +26,19 @@ test('usage reports disjoint prompt, visible completion, and reasoning counts', 
 
 test('missing or invalid usage does not invent counts or produce negative completion tokens', () => {
   for (const usage of [undefined, null, [], { prompt_tokens: -1, completion_tokens: '50' }])
-    assert.equal(
-      formatTokenUsage(usage),
-      'prompt tokens: unavailable / completion tokens: unavailable / reasoning tokens: unavailable',
-    );
-  assert.equal(
-    formatTokenUsage({ prompt_tokens: 100, completion_tokens: 50 }),
-    'prompt tokens: 100 / completion tokens: unavailable / reasoning tokens: unavailable',
-  );
+    assert.equal(formatTokenUsage(usage), 'prompt tokens: unavailable / completion tokens: unavailable');
   for (const reasoning of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 60])
     assert.match(
       formatTokenUsage({ completion_tokens: 50, completion_tokens_details: { reasoning_tokens: reasoning } }),
       /completion tokens: unavailable/,
+    );
+});
+
+test('omits absent reasoning counts and retains the full completion count', () => {
+  for (const details of [undefined, null, {}, { reasoning_tokens: null }])
+    assert.equal(
+      formatTokenUsage({ prompt_tokens: 100, completion_tokens: 50, completion_tokens_details: details }),
+      'prompt tokens: 100 / completion tokens: 50',
     );
 });
 
