@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: hgschmie/openrouter-review@v1.1.1
+      - uses: hgschmie/openrouter-review@v1.2.0
         with:
           api-key: ${{ secrets.OPENROUTER_API_KEY }}
           model: deepseek/deepseek-v4-flash
@@ -107,7 +107,7 @@ Default user prompt:
 
 > Write all review explanations in English, regardless of the language used in the code or comments. Please review the following code changes
 
-The English-language instruction is unreleased; `v1.1.1` retains the earlier user prompt. Until the next release, pin a commit containing this change or set `user-prompt` explicitly.
+The English-language instruction was added in `v1.2.0`; earlier releases retain the original user prompt.
 
 The user message consists of the user prompt, a colon and newline, and the filtered diff. For comment triggers, the triggering comment is appended inside `<comment>` tags. These delimiters organize context; they do not guarantee that a model will ignore instructions embedded in code or comments. The action does not supply tools or execute model instructions. Provider-side features enabled through `request-options` follow that provider's behavior and policies.
 
