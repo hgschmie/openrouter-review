@@ -45,10 +45,10 @@ inputs:
     description: Comma or newline separated globs to exclude; exclusions win.
     default: pnpm-lock.yaml,package-lock.json,*.lock
   max-diff-chars:
-    description: Maximum filtered diff size in Unicode code points; 0 disables the limit.
+    description: Maximum filtered diff size in Unicode code points; exceeding it fails the action. 0 disables the limit.
     default: '100000'
   max-diff-bytes:
-    description: Maximum raw diff download in decoded bytes before filtering. Must be positive; oversized reviews are skipped.
+    description: Maximum raw diff download in decoded bytes before filtering. Must be positive; exceeding it fails the action.
     default: '20971520'
   timeout-seconds:
     description: Timeout per HTTP attempt (1 to 1800 seconds).

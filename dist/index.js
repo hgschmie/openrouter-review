@@ -26915,7 +26915,9 @@ minimatch.unescape = unescape;
 // src/diff.ts
 var DiffTooLargeError = class extends Error {
   constructor(maxBytes) {
-    super(`Raw diff exceeds max-diff-bytes (${maxBytes} bytes).`);
+    super(
+      `Raw diff exceeds max-diff-bytes (${maxBytes} bytes). Reduce the PR diff or increase max-diff-bytes. This limit applies before file filtering.`
+    );
   }
 };
 async function readDiff(body, maxBytes, contentLength) {
@@ -27264,20 +27266,14 @@ async function runReview(config, trigger, github, complete = completeReview, inf
   if (commit.sha !== pr.head) return { skippedReason: "Pull request changed while reading its commits." };
   if (/skip (?:cr|review)/i.test(commit.message))
     return { skippedReason: "Head commit requests skipping the review." };
-  let raw;
-  try {
-    raw = await github.getDiff();
-  } catch (error2) {
-    if (error2 instanceof DiffTooLargeError) return { skippedReason: error2.message };
-    throw error2;
-  }
+  let raw = await github.getDiff();
   const diff = filterDiff(raw, config.include, config.exclude);
   raw = "";
   if (!diff.trim()) return { skippedReason: "No reviewable changes remain after filtering." };
   if (exceedsCharLimit(diff, config.maxDiffChars))
-    return {
-      skippedReason: `Filtered diff exceeds max-diff-chars (${config.maxDiffChars} characters).`
-    };
+    throw new Error(
+      `Filtered diff exceeds max-diff-chars (${config.maxDiffChars} characters). Reduce the diff with file filters, increase max-diff-chars, or set it to 0 to disable the character limit.`
+    );
   const request2 = buildRequest(config, diff, trigger.comment);
   const hash = (0, import_node_crypto.createHash)("sha256").update(
     JSON.stringify(

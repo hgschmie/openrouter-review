@@ -20,12 +20,27 @@ const scenarios: {
   reasoning?: Record<string, unknown>;
   notice?: string;
   usage?: boolean | 'without-reasoning';
+  expectedError?: RegExp;
 }[] = [
   { name: 'normal diff', diffMode: 'normal' },
   { name: 'response without usage', diffMode: 'normal', usage: false },
   { name: 'usage without reasoning count', diffMode: 'normal', usage: 'without-reasoning' },
-  { name: 'oversized chunked diff', diffMode: 'oversized-chunked' },
-  { name: 'oversized gzip diff', diffMode: 'oversized-gzip' },
+  {
+    name: 'oversized chunked diff',
+    diffMode: 'oversized-chunked',
+    expectedError: /::error::Raw diff exceeds max-diff-bytes/,
+  },
+  {
+    name: 'oversized gzip diff',
+    diffMode: 'oversized-gzip',
+    expectedError: /::error::Raw diff exceeds max-diff-bytes/,
+  },
+  {
+    name: 'oversized filtered diff',
+    diffMode: 'normal',
+    inputs: { 'max-diff-chars': '1' },
+    expectedError: /::error::Filtered diff exceeds max-diff-chars/,
+  },
   {
     name: 'disabled reasoning with conflicting settings',
     diffMode: 'normal',
@@ -57,6 +72,7 @@ for (const {
   reasoning = { effort: 'high', exclude: false },
   notice,
   usage = true,
+  expectedError,
 } of scenarios)
   test(
     `standalone bundle handles ${name} through real HTTP and exports action outputs`,
@@ -172,27 +188,31 @@ for (const {
             Object.entries(inputs).map(([name, value]) => [`INPUT_${name.toUpperCase()}`, value]),
           ),
         };
-        const result = await exec(process.execPath, [join(dir, 'index.js')], {
+        const execution = exec(process.execPath, [join(dir, 'index.js')], {
           cwd: dir,
           env,
           timeout: 20_000,
         });
+        if (expectedError) {
+          await assert.rejects(execution, (error: Error & { code?: number; stdout: string }) => {
+            assert.equal(error.code, 1);
+            assert.match(error.stdout, expectedError);
+            assert.doesNotMatch(error.stdout, /Requesting model review|prompt tokens:|::notice::/);
+            return true;
+          });
+          assert.deepEqual(errors, []);
+          assert.equal(modelRequest, undefined);
+          assert.equal(posted, undefined);
+          assert.equal(requests.filter((r) => r.method === 'POST').length, 0);
+          assert.equal(await readFile(join(dir, 'outputs'), 'utf8'), '');
+          return;
+        }
+        const result = await execution;
         assert.deepEqual(errors, []);
         if (notice) assert.ok(result.stdout.includes(`::notice::${notice}`));
         else assert.doesNotMatch(result.stdout, /reasoning disabled because effort is set to none/);
         // @actions/core writes platform-native line endings to GITHUB_OUTPUT.
         const outputs = (await readFile(join(dir, 'outputs'), 'utf8')).replace(/\r\n/g, '\n');
-        if (diffMode !== 'normal') {
-          assert.match(result.stdout, /Raw diff exceeds max-diff-bytes/);
-          assert.doesNotMatch(result.stdout, /Requesting model review/);
-          assert.doesNotMatch(result.stdout, /prompt tokens:/);
-          assert.equal(modelRequest, undefined);
-          assert.equal(posted, undefined);
-          assert.equal(requests.filter((r) => r.method === 'POST').length, 0);
-          assert.match(outputs, /skipped-reason<<[^\n]+\nRaw diff exceeds/);
-          assert.match(outputs, /reviewed-sha<<[^\n]+\n\n/);
-          return;
-        }
         assert.match(result.stdout, /Review published/);
         const usageLine =
           usage === 'without-reasoning'

@@ -2,7 +2,9 @@ import { Minimatch } from 'minimatch';
 
 export class DiffTooLargeError extends Error {
   constructor(maxBytes: number) {
-    super(`Raw diff exceeds max-diff-bytes (${maxBytes} bytes).`);
+    super(
+      `Raw diff exceeds max-diff-bytes (${maxBytes} bytes). Reduce the PR diff or increase max-diff-bytes. This limit applies before file filtering.`,
+    );
   }
 }
 

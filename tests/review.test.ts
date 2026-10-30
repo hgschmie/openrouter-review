@@ -92,23 +92,37 @@ test('honors the head commit skip marker', async () => {
   assert.equal(f.seen.modelCalls, 0);
 });
 
-test('skips all-filtered and oversized diffs without making a paid request', async () => {
-  const cases: Record<string, string>[] = [{ 'include-patterns': 'absent/**' }, { 'max-diff-chars': '1' }];
-  for (const overrides of cases) {
-    const f = fixture();
-    const result = await runReview(config(overrides), f.trigger, f.github, f.complete);
-    assert.ok(result.skippedReason);
-    assert.equal(f.seen.modelCalls, 0);
-  }
+test('skips all-filtered diffs without making a paid request', async () => {
+  const f = fixture();
+  const result = await runReview(
+    config({ 'include-patterns': 'absent/**' }),
+    f.trigger,
+    f.github,
+    f.complete,
+  );
+  assert.ok(result.skippedReason);
+  assert.equal(f.seen.modelCalls, 0);
 });
 
-test('oversized downloads skip without a model call or review, even with the character limit disabled', async () => {
+test('oversized filtered diffs fail without a model call or review', async () => {
+  const f = fixture();
+  await assert.rejects(
+    runReview(config({ 'max-diff-chars': '1' }), f.trigger, f.github, f.complete),
+    /Filtered diff exceeds max-diff-chars \(1 characters\).*increase max-diff-chars/,
+  );
+  assert.equal(f.seen.modelCalls, 0);
+  assert.equal(f.seen.writes, 0);
+});
+
+test('oversized downloads fail without a model call or review, even with the character limit disabled', async () => {
   const f = fixture();
   f.github.getDiff = async () => {
     throw new DiffTooLargeError(20971520);
   };
-  const result = await runReview(config({ 'max-diff-chars': '0' }), f.trigger, f.github, f.complete);
-  assert.deepEqual(result, { skippedReason: 'Raw diff exceeds max-diff-bytes (20971520 bytes).' });
+  await assert.rejects(
+    runReview(config({ 'max-diff-chars': '0' }), f.trigger, f.github, f.complete),
+    /Raw diff exceeds max-diff-bytes \(20971520 bytes\).*increase max-diff-bytes/,
+  );
   assert.equal(f.seen.modelCalls, 0);
   assert.equal(f.seen.writes, 0);
 });

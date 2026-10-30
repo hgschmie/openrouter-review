@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Config } from './config.ts';
 import { object } from './config.ts';
-import { DiffTooLargeError, exceedsCharLimit, filterDiff } from './diff.ts';
+import { exceedsCharLimit, filterDiff } from './diff.ts';
 import type { PrClient, PullRequest, Trigger } from './github.ts';
 import { buildRequest, completeReview, formatReview } from './openrouter.ts';
 
@@ -45,20 +45,14 @@ export async function runReview(
   if (commit.sha !== pr.head) return { skippedReason: 'Pull request changed while reading its commits.' };
   if (/skip (?:cr|review)/i.test(commit.message))
     return { skippedReason: 'Head commit requests skipping the review.' };
-  let raw: string;
-  try {
-    raw = await github.getDiff();
-  } catch (error) {
-    if (error instanceof DiffTooLargeError) return { skippedReason: error.message };
-    throw error;
-  }
+  let raw = await github.getDiff();
   const diff = filterDiff(raw, config.include, config.exclude);
   raw = '';
   if (!diff.trim()) return { skippedReason: 'No reviewable changes remain after filtering.' };
   if (exceedsCharLimit(diff, config.maxDiffChars))
-    return {
-      skippedReason: `Filtered diff exceeds max-diff-chars (${config.maxDiffChars} characters).`,
-    };
+    throw new Error(
+      `Filtered diff exceeds max-diff-chars (${config.maxDiffChars} characters). Reduce the diff with file filters, increase max-diff-chars, or set it to 0 to disable the character limit.`,
+    );
   const request = buildRequest(config, diff, trigger.comment);
   const hash = createHash('sha256')
     .update(

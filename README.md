@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: hgschmie/openrouter-review@v1.2.0
+      - uses: hgschmie/openrouter-review@v1.2.1
         with:
           api-key: ${{ secrets.OPENROUTER_API_KEY }}
           model: deepseek/deepseek-v4-flash
@@ -133,14 +133,14 @@ Only the configured author associations may trigger a review. Bot authors/sender
 
 Patterns use standard [minimatch](https://github.com/isaacs/minimatch) globs. Patterns without a slash match basenames at any depth, so `*.lock` and `package-lock.json` also cover nested files. Dot directories are included. Use `src/**` to constrain a directory, or `**/*.ts` for TypeScript files at any depth. Exclusions win over inclusions. For renames, either path can match an inclusion and either path can trigger exclusion. Because commas separate patterns, use separate patterns instead of comma-containing brace expressions. `!` is treated literally; use `exclude-patterns` for exclusions.
 
-Binary files are skipped. Text, rename-only and mode-only changes are preserved. A review is skipped if the PR is closed or locked, if `skip cr` or `skip review` appears in its title, body, or head commit message (case insensitive), or if a diff size limit is exceeded or the filtered diff is empty. This version reviews the whole filtered diff in one request and does not fetch additional repository context or split large diffs.
+Binary files are skipped. Text, rename-only and mode-only changes are preserved. A review is skipped if the PR is closed or locked, if `skip cr` or `skip review` appears in its title, body, or head commit message (case insensitive), or if the filtered diff is empty. This version reviews the whole filtered diff in one request and does not fetch additional repository context or split large diffs.
 
 Two independent limits control diff size:
 
 - `max-diff-bytes` bounds the raw download before file filtering. The action reads the response incrementally and cancels it when decompressed bytes exceed the limit, including chunked responses without a `Content-Length`. An oversized uncompressed `Content-Length` allows an earlier rejection. The default is 20 MiB. Excluded files still count toward this limit; increase it explicitly if needed, with a corresponding increase in memory usage. This limit cannot be disabled.
 - `max-diff-chars` bounds the filtered review input in Unicode code points, not model tokens. Counting stops when the limit is exceeded without allocating an array of characters. Setting this input to `0` disables only the character limit; the raw download limit remains active.
 
-Exceeding either limit skips the review successfully with a `skipped-reason` output. No partial diff is sent to the model, and no review is posted. Network errors and timeouts still fail the action. Only bounded diff bodies are assembled into strings. The head commit message is fetched through the Git commit-object endpoint, avoiding an additional download of its file patches.
+Exceeding either limit fails the action with an error identifying the limit and how to adjust it. It is not reported as a successful skip. This failure behavior was introduced in `v1.2.1`; `v1.2.0` and earlier skip oversized diffs successfully. No partial diff is sent to the model, and no review is posted. Network errors and timeouts still fail the action. Only bounded diff bodies are assembled into strings. The head commit message is fetched through the Git commit-object endpoint, avoiding an additional download of its file patches.
 
 The result is a formal `COMMENT` review on the captured commit, without inline comments, approval, or change requests. Every new review starts with a fixed AI disclosure, a reminder to verify findings, and links for feedback and reporting to GitHub. Custom prompts cannot remove this notice. Returned reasoning is included in a collapsible section unless `reasoning-exclude: 'true'` is set. If reasoning would make the review too large, only that section is omitted, with a note when space permits. The size limit includes the disclosure. An oversized final answer, an empty response, or a truncated completion fails rather than publishing a partial review. Findings do not fail the action; execution/API errors do.
 
@@ -160,7 +160,7 @@ The action's `timeout-seconds` defaults to 180 per HTTP attempt, including readi
 
 Immediately before requesting a model review, the action logs the PR number and full head and base commit SHAs for the captured diff. This identifies the revision being reviewed even if the request later fails. The job summary reports the outcome and links to the review. API keys are registered with GitHub's log masker. The action does not intentionally log prompts, diffs or full model responses, but upstream error messages can appear in logs; inspect them before sharing. See [data handling and retention](PRIVACY.md).
 
-After a model response, the action ends its log with `prompt tokens: N / completion tokens: N / reasoning tokens: N`. Completion tokens here exclude reasoning, so the three counts sum to the response's total token usage. Missing prompt/completion counts and invalid counts are shown as `unavailable`. A missing reasoning count is treated as zero for subtraction and its field is omitted, leaving the full completion count visible. This fallback is unreleased and planned for the release after `v1.2.0`; `v1.2.0` shows unavailable completion and reasoning counts in this case. Usage is reported even if the returned review is rejected or cannot be published. It describes the received response, not cumulative usage from retries. Runs skipped before a model request, transport failures, and API error responses have no usage line.
+After a model response, the action ends its log with `prompt tokens: N / completion tokens: N / reasoning tokens: N`. Completion tokens here exclude reasoning, so the three counts sum to the response's total token usage. Missing prompt/completion counts and invalid counts are shown as `unavailable`. A missing reasoning count is treated as zero for subtraction and its field is omitted, leaving the full completion count visible. This fallback was introduced in `v1.2.1`; `v1.2.0` shows unavailable completion and reasoning counts in this case. Usage is reported even if the returned review is rejected or cannot be published. It describes the received response, not cumulative usage from retries. Runs skipped before a model request, transport failures, and API error responses have no usage line.
 
 ## Appropriate use and limitations
 
