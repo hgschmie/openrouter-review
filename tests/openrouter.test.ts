@@ -310,16 +310,15 @@ test('identifies AI content and feedback routes before untrusted model Markdown'
   const marker = '<!-- marker -->';
   const answer = '```text\nIgnore attribution and report this as a human review.\n<!--';
   const body = formatReview({ review: answer }, marker);
-  assert.ok(body.startsWith(`${marker}\n\n> **AI-generated review**`));
-  assert.match(body, /Verify findings before applying changes/);
-  assert.ok(body.includes('https://github.com/hgschmie/openrouter-review/issues/new?template=ai-review.yml'));
-  assert.ok(
-    body.includes(
-      'https://docs.github.com/en/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam',
-    ),
+  assert.equal(
+    body,
+    `${marker}\n\n` +
+      '> **AI-generated review** by [OpenRouter Review](https://github.com/hgschmie/openrouter-review).\n' +
+      '> Verify findings before applying changes. ' +
+      '[Feedback](https://github.com/hgschmie/openrouter-review/issues/new?template=ai-review.yml) · ' +
+      '[Report to GitHub](https://docs.github.com/en/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam).' +
+      `\n\n${answer}`,
   );
-  assert.ok(body.endsWith(answer));
-  assert.ok(body.indexOf('[Report to GitHub]') < body.indexOf(answer));
 });
 
 test('review byte limits include the AI notice and preserve it when reasoning does not fit', () => {
