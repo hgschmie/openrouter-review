@@ -1,0 +1,43 @@
+name: Code review
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, labeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    # Adding the label approves one review; its continued presence approves nothing.
+    if: >-
+      !github.event.pull_request.draft &&
+      ((github.event.action != 'labeled' &&
+        contains(fromJSON('["OWNER", "MEMBER"]'), github.event.pull_request.author_association)) ||
+       (github.event.action == 'labeled' && github.event.label.name == 'code-review'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: code-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - name: Review PR through OpenRouter
+        uses: hgschmie/openrouter-review@3f028c7c0f8284354a05def05b1da4cbd3ee922b # v1.2.1
+        with:
+          api-key: ${{ secrets.OPENROUTER_API_KEY }}
+          base-url: https://openrouter.ai/api/v1
+          model: ${{ vars.DEEPSEEK_REVIEW_MODEL || 'deepseek/deepseek-v4-flash' }}
+          reasoning-exclude: true
+          reasoning-enabled: true
+          reasoning-max-tokens: 8192
+          max-tokens: 131072
+          max-diff-chars: 0
+          timeout-seconds: 1500
+          user-prompt: |
+            Please review the following code changes.
+            Write all review explanations in English, regardless of the language used in the code or comments.
+            Your job is to review the changes in the PR and those changes only. Do not widen the scope of the review or suggest major refactorings.
+            Focus on the major findings, do not overly polish. Point out parts that are hard to read for a human.
+            Focus on the actual code changes, not the tests. Review the tests for completeness and functionality but do not polish them.
