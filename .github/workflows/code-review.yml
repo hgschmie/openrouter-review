@@ -3,9 +3,7 @@ name: Code review
 on:
   pull_request_target:
     branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-  issue_comment:
-    types: [created]
+    types: [opened, reopened, synchronize, ready_for_review, labeled]
 
 permissions:
   contents: read
@@ -13,61 +11,24 @@ permissions:
 
 jobs:
   review:
-    # Skip outside events before allocating a runner. The gate below also checks
-    # the PR author, comment author, target branch, and current PR state.
+    # Adding the label approves one review; its continued presence approves nothing.
     if: >-
-      github.event.sender.login == 'hgschmie' &&
-      (github.event_name == 'pull_request_target' ||
-       (github.event.issue.pull_request && github.event.comment.body == '@code-review'))
+      !github.event.pull_request.draft &&
+      ((github.event.action != 'labeled' &&
+        contains(fromJSON('["OWNER", "MEMBER"]'), github.event.pull_request.author_association)) ||
+       (github.event.action == 'labeled' && github.event.label.name == 'code-review'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
-      group: code-review-${{ github.event.pull_request.number || github.event.issue.number }}
+      group: code-review-${{ github.event.pull_request.number }}
       cancel-in-progress: false
     steps:
-      - name: Check review authorization
-        id: gate
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const { payload, eventName, repo } = context;
-            const owner = 'hgschmie';
-            const isOwner = user => user?.login === owner && user?.type === 'User';
-            if (!isOwner(payload.sender)) return false;
-
-            let number;
-            if (eventName === 'pull_request_target') {
-              if (!['opened', 'reopened', 'synchronize', 'ready_for_review'].includes(payload.action) ||
-                  !isOwner(payload.pull_request?.user)) return false;
-              number = payload.pull_request.number;
-            } else if (eventName === 'issue_comment') {
-              if (payload.action !== 'created' || !payload.issue?.pull_request ||
-                  !isOwner(payload.comment?.user) ||
-                  payload.comment.author_association !== 'OWNER' ||
-                  payload.comment.body !== '@code-review') return false;
-              number = payload.issue.number;
-            } else {
-              return false;
-            }
-
-            // Comment events have no branch filter; check the live PR for both paths.
-            const { data: pr } = await github.rest.pulls.get({ ...repo, pull_number: number });
-            if (pr.base.ref !== 'main' || pr.base.repo.full_name !== `${repo.owner}/${repo.repo}` ||
-                pr.state !== 'open' || pr.draft || pr.locked) {
-              core.notice('Review requires an open, ready, unlocked PR targeting main.');
-              return false;
-            }
-            return true;
-
       - name: Review PR through OpenRouter
-        if: steps.gate.outputs.result == 'true'
         uses: hgschmie/openrouter-review@3f028c7c0f8284354a05def05b1da4cbd3ee922b # v1.2.1
         with:
           api-key: ${{ secrets.OPENROUTER_API_KEY }}
           base-url: https://openrouter.ai/api/v1
           model: ${{ vars.DEEPSEEK_REVIEW_MODEL || 'deepseek/deepseek-v4-flash' }}
-          watch-mention: '@code-review'
-          allowed-associations: OWNER
           reasoning-exclude: true
           reasoning-enabled: true
           reasoning-max-tokens: 8192
