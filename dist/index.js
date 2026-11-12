@@ -24606,7 +24606,7 @@ function boolean(value, name) {
   if (value === false || value === "false") return false;
   throw new Error(`${name} must be true or false.`);
 }
-function readConfig(getInput2, notice2) {
+function readReviewConfig(getInput2, notice2) {
   const input = (name) => getInput2(name) || defaults2[name] || "";
   const required = (name) => {
     const value = input(name).trim();
@@ -24694,7 +24694,6 @@ function readConfig(getInput2, notice2) {
   const exclude = getInput2("exclude-patterns");
   return {
     apiKey: required("api-key"),
-    githubToken: required("github-token"),
     baseUrl: base.href.replace(/\/+$/, ""),
     model: required("model"),
     systemPrompt: input("sys-prompt"),
@@ -24704,9 +24703,18 @@ function readConfig(getInput2, notice2) {
     exclude: exclude.split(/[,\n]/).map((value) => value.trim()).filter(Boolean),
     maxDiffChars: number(Number(input("max-diff-chars")), "max-diff-chars", 0),
     maxDiffBytes: number(Number(input("max-diff-bytes")), "max-diff-bytes", 1),
-    timeoutMs: number(Number(input("timeout-seconds")), "timeout-seconds", 1, 1800) * 1e3,
-    watchMention: input("watch-mention").trim(),
-    allowedAssociations: patterns("allowed-associations")
+    timeoutMs: number(Number(input("timeout-seconds")), "timeout-seconds", 1, 1800) * 1e3
+  };
+}
+function readConfig(getInput2, notice2) {
+  const review = readReviewConfig(getInput2, notice2);
+  const githubToken = getInput2("github-token").trim();
+  if (!githubToken) throw new Error("github-token is required.");
+  return {
+    ...review,
+    githubToken,
+    watchMention: getInput2("watch-mention").trim(),
+    allowedAssociations: (getInput2("allowed-associations") || defaults2["allowed-associations"]).split(/[,\n]/).map((value) => value.trim()).filter(Boolean)
   };
 }
 

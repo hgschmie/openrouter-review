@@ -13,9 +13,8 @@ export const defaults = {
   'allowed-associations': 'OWNER,MEMBER,COLLABORATOR',
 };
 
-export interface Config {
+export interface ReviewConfig {
   apiKey: string;
-  githubToken: string;
   baseUrl: string;
   model: string;
   systemPrompt: string;
@@ -26,6 +25,10 @@ export interface Config {
   maxDiffChars: number;
   maxDiffBytes: number;
   timeoutMs: number;
+}
+
+export interface Config extends ReviewConfig {
+  githubToken: string;
   watchMention: string;
   allowedAssociations: string[];
 }
@@ -59,7 +62,10 @@ function boolean(value: unknown, name: string): boolean {
   throw new Error(`${name} must be true or false.`);
 }
 
-export function readConfig(getInput: (name: string) => string, notice?: (message: string) => void): Config {
+export function readReviewConfig(
+  getInput: (name: string) => string,
+  notice?: (message: string) => void,
+): ReviewConfig {
   const input = (name: string) => getInput(name) || defaults[name as keyof typeof defaults] || '';
   const required = (name: string) => {
     const value = input(name).trim();
@@ -172,7 +178,6 @@ export function readConfig(getInput: (name: string) => string, notice?: (message
   const exclude = getInput('exclude-patterns');
   return {
     apiKey: required('api-key'),
-    githubToken: required('github-token'),
     baseUrl: base.href.replace(/\/+$/, ''),
     model: required('model'),
     systemPrompt: input('sys-prompt'),
@@ -186,7 +191,20 @@ export function readConfig(getInput: (name: string) => string, notice?: (message
     maxDiffChars: number(Number(input('max-diff-chars')), 'max-diff-chars', 0),
     maxDiffBytes: number(Number(input('max-diff-bytes')), 'max-diff-bytes', 1),
     timeoutMs: number(Number(input('timeout-seconds')), 'timeout-seconds', 1, 1800) * 1000,
-    watchMention: input('watch-mention').trim(),
-    allowedAssociations: patterns('allowed-associations'),
+  };
+}
+
+export function readConfig(getInput: (name: string) => string, notice?: (message: string) => void): Config {
+  const review = readReviewConfig(getInput, notice);
+  const githubToken = getInput('github-token').trim();
+  if (!githubToken) throw new Error('github-token is required.');
+  return {
+    ...review,
+    githubToken,
+    watchMention: getInput('watch-mention').trim(),
+    allowedAssociations: (getInput('allowed-associations') || defaults['allowed-associations'])
+      .split(/[,\n]/)
+      .map((value) => value.trim())
+      .filter(Boolean),
   };
 }

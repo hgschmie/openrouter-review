@@ -1,6 +1,6 @@
 # Privacy and data handling
 
-Updated: October 29, 2026. This notice describes the current source of OpenRouter Review. Review the version you deploy and the policies of the services you select.
+Updated: November 11, 2026. This notice describes the current source of OpenRouter Review. Review the version you deploy and the policies of the services you select.
 
 OpenRouter Review is maintained by Henning Schmiedehausen. It runs inside your GitHub Actions runner and uses your credentials. The maintainer does not operate an inference backend for this action. The action contains no maintainer telemetry, analytics service, or separate database. The maintainer receives information you choose to submit by [filing a GitHub issue](https://github.com/hgschmie/openrouter-review/issues/new/choose). These reports are public; see [support and reporting](SUPPORT.md) before submitting information.
 
@@ -21,6 +21,20 @@ The action uses the GitHub token with GitHub's API and the model API key with th
 The action does not intentionally print prompts, diffs, or full model responses to logs. Provider and GitHub error messages may appear in logs and can contain information from a request. Inspect logs before sharing them. The default endpoints use HTTPS; use HTTPS for remote custom endpoints too. HTTP is supported for local testing and does not protect credentials or content in transit.
 
 ## Retention, training, and processing locations
+
+The local `or-review` CLI sends the selected filtered Git diff and configured
+prompts directly to the configured model endpoint. This can include staged or
+unstaged work that has never been uploaded to GitHub. It prints the review to
+stdout and diagnostics and token usage to stderr; it does not publish the result
+to GitHub. Redirected output, terminal history, backups, and provider retention
+are controlled by you and the services you select. Dry runs do not contact the
+model endpoint.
+
+CLI credentials are stored in a permission-protected plaintext file outside Git
+working trees, or supplied through `OPENROUTER_API_KEY`. The CLI masks the active
+key in error messages but is not a general secret scanner. Project `.or-review`
+files cannot contain credentials or override the endpoint. See the
+[CLI documentation](docs/cli.md) for storage locations and deletion instructions.
 
 The action assembles review inputs in process memory and does not deliberately save a separate copy of the diff or model response to disk. GitHub event files, logs, summaries, review comments, runner diagnostics, swap, and backups are outside that statement. Runner disposal and cleanup depend on your GitHub-hosted or self-hosted environment; terminating a process is not a secure-erasure guarantee.
 

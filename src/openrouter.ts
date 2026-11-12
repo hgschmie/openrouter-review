@@ -1,8 +1,8 @@
-import type { Config } from './config.ts';
+import type { ReviewConfig } from './config.ts';
 import { object } from './config.ts';
 import { HttpError, withRetries } from './http.ts';
 
-export function buildRequest(config: Config, diff: string, comment?: string): Record<string, unknown> {
+export function buildRequest(config: ReviewConfig, diff: string, comment?: string): Record<string, unknown> {
   let content = `${config.userPrompt}:\n${diff}`;
   if (comment)
     content += `\n\nAdditional context from PR comment (enclosed in <comment> tags):\n<comment>\n${comment}\n</comment>`;
@@ -40,7 +40,7 @@ export function formatTokenUsage(usage: unknown): string {
 }
 
 export async function completeReview(
-  config: Config,
+  config: ReviewConfig,
   payload: Record<string, unknown>,
   fetchImpl: typeof fetch = fetch,
   wait?: (ms: number) => Promise<unknown>,

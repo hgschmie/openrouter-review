@@ -113,6 +113,17 @@ function paths(block: string): string[] {
   return [oldPath, newPath];
 }
 
+export function diffFiles(diff: string): string[] {
+  return [
+    ...new Set(
+      diff
+        .split(/(?=^diff --git )/m)
+        .filter((block) => block.startsWith('diff --git '))
+        .flatMap(paths),
+    ),
+  ];
+}
+
 export function filterDiff(diff: string, include: string[], exclude: string[]): string {
   const matcher = (pattern: string) =>
     new Minimatch(pattern, { dot: true, matchBase: true, nonegate: true, nocomment: true });
